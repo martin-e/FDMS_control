@@ -583,13 +583,13 @@ class FlyCapture():
             
 ## ********************************************************
 
-'''if __name__  == '__main__':
+if __name__  == '__main__':
     import time
     
     cam = FlyCapture(libdir = '', debug = True)
-    format7Mode = 7
+    format7Mode = 0
     pixelFormat = fc2PixelFormat.FC2_PIXEL_FORMAT_MONO16.value
-    roi = [100, 400, 480, 640]  # [offset_X, offset_Y, width, height]
+    roi = [100, 400, 480, 640]  # [offset_left, offset_top, width, height]
     
     print cam
     numCameras = cam.getNumOfCameras()
@@ -663,7 +663,7 @@ class FlyCapture():
             print("\n**********************************\n")
 
         if 1:
-            integrationTime = 5 #1000/frameRate-40   # ms
+            integrationTime = 15  # ms
             print ("set gain to zero and integration time to %.3f ms" % integrationTime)
             propType = fc2PropertyType.FC2_SHUTTER
             propInfo = cam.getPropertyInfo(propType.value)
@@ -680,7 +680,7 @@ class FlyCapture():
             print ("gain is now: %.3f dB" % cam.getProperty(fc2PropertyType.FC2_GAIN.value).absValue)
             print("\n**********************************\n")
             
-        if 0:
+        if 1:
             print("listing available FORMAT7 modes:\n")
             cam.availableFormat7Modes = list()
             for mode in fc2Mode:
@@ -693,7 +693,7 @@ class FlyCapture():
                     print [ a.name for a in cam.getSupportedFormat7PixelFormats(format7Info) ]
             print("\n**********************************\n")
 
-        if 1:
+        if 0:
             print("attempt to set FORMAT7 mode...")
             (supported, fm7Info)= cam.getFormat7Info(format7Mode)
             fm7Settings = Format7ImageSettingsStruct()
@@ -729,7 +729,9 @@ class FlyCapture():
             image = cam.retrieveBuffer(image)
             print "stop capture"
             cam.stopCapture()
-            
+        
+		# block below does not work yet!!!
+		# The statistics functions do not function properly / correct order of calling the functions is not yet known
         if 0:
             print "calculate image statistics"
             context = cam.createImageStatistics()
@@ -737,37 +739,38 @@ class FlyCapture():
             channel = 1 #grey
             st = cam.getImageStatistics(context, 1)
             
-        if 0:
+        if 1:
             filename = ("%04d%02d%02d%02d%02d%02d_testimage.tiff" % (nw[0], nw[1], nw[2], nw[3], nw[4], nw[5]))
             option = TIFFOptionStruct()
             option.compressionMethod = 1   # uncompressed
             print ("Saving image to %s" % filename)
             cam.saveImageWithOption(image, filename, 5, option)
             
-        if 1:
+        if 0:
             import numpy as np
             import matplotlib.pyplot as plt
-            if fc2PixelFormat(image.pixFormat).name == 'FC2_PIXEL_FORMAT_MONO12':
-                image2 = cam.convertImageTo(fc2PixelFormat.FC2_PIXEL_FORMAT_MONO16.value, image)
-                imageData = cam.getImageData(image2)
-            else:
-                imageData = cam.getImageData(image)
+			# 12 bit per pixel readout is not yet supported
+            #if fc2PixelFormat(image.pixFormat).name == 'FC2_PIXEL_FORMAT_MONO12':
+            #    image2 = cam.convertImageTo(fc2PixelFormat.FC2_PIXEL_FORMAT_MONO16.value, image)
+            #    imageData = cam.getImageData(image2)
+            #else:
+            imageData = cam.getImageData(image)
             if fc2PixelFormat(image.pixFormat).name == 'FC2_PIXEL_FORMAT_MONO8':
                 dtype=np.uint8
             else:
                 dtype=np.uint16
                 
             imageArray = np.fromstring(imageData,  dtype)
-            if fc2PixelFormat(image.pixFormat).name == 'FC2_PIXEL_FORMAT_MONO12':
-                imageArray = imageArray >> 4
+            # 12 bit per pixel readout is not yet supported
+			#if fc2PixelFormat(image.pixFormat).name == 'FC2_PIXEL_FORMAT_MONO12':
+            #    imageArray = imageArray >> 4
             plaatje = imageArray.reshape([image.rows, image.cols])
             fh = plt.imshow(plaatje)
             cb = plt.colorbar()
             fh2= plt.figure()
             histData = plt.hist(imageArray, bins=64)
         
-    if 0:
+    if 1:
         cam.destroyContext()
         cam.unloadLib()
         del(cam)
-'''

@@ -100,7 +100,7 @@ for a in steps:
     if a+1 < len(steps):
         piezo.setVoltage(piezoVoltages[a+1])
     filename = ("%s_im_%d.tiff" % (timestamp, a))
-    print "Saving image %d to %s" % (a, filename)
+    print ("Saving image %d to %s" % (a, filename))
     cam.saveImageWithOption(image, filename, 5, option)
     #imageData = cam.getImageData(image)
     #imageData = np.fromstring(imageData,  dtype)

@@ -1,6 +1,6 @@
-import LabJackPython, u3, struct, time
+import LabJackPython, u3, struct
 
-class LabJackError(StandardError):
+class LabJackError(Exception):
     pass
 
 def toDouble(buffer):
@@ -9,11 +9,8 @@ def toDouble(buffer):
     Args: buffer, an array with 8 bytes
     Desc: Converts the 8 byte array into a floating point number.
     """
-    if type(buffer) == type(''):
-        bufferStr = buffer[:8]
-    else:
-        bufferStr = ''.join(chr(x) for x in buffer[:8])
-    dec, wh = struct.unpack('<Ii', bufferStr)
+    bufferBytes = bytes(buffer[:8])
+    dec, wh = struct.unpack('<Ii', bufferBytes)
     return float(wh) + float(dec)/2**32
 
 class LabJackU3():
@@ -77,7 +74,7 @@ class Piezo():
             raise LabJackError("no device connected")
         (hiBit, loBit) = self.voltageToBits(voltage)
         self.u3device.device.i2c(self.u3device.DAC_ADDRESS, [48, hiBit, loBit], SDAPinNum = self.u3device.sdaPin, SCLPinNum = self.u3device.sclPin)
-        self.voltage = self.bitvalToVoltage(hiBit, loBit)
+        self.voltage = voltage
 
     def setPiezoBitval(self, bitval):
         if not self.u3device.isConnected:
@@ -108,10 +105,8 @@ class Adc():
             raise LabJackError("no device connected")
     
     def readValue(self):
-        bitval = self.u3device.device.getFeedback(u3.AIN(self.u3device.U3_ADC_PIN))
-        voltage = self.u3device.device.binaryToCalibratedAnalogVoltage(bitval[0])
-        print voltage
-        print self.u3device.device.getAIN(self.u3device.U3_ADC_PIN)
+        voltage = self.u3device.device.getAIN(self.u3device.U3_ADC_PIN)
+        # voltage = self.u3device.device.binaryToCalibratedAnalogVoltage(bitval[0])
         return voltage
         
 class Pulser():
@@ -121,7 +116,6 @@ class Pulser():
         if not self.u3device.isConnected:
             raise LabJackError("no device connected")
         self.setOutput(dio_val)
-    pass
     
     def setOutput(self, dio_val):
         self.u3device.device.setDIOState(self.u3device.U3_DIO_PIN, bool(dio_val))

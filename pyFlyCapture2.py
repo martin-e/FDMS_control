@@ -117,7 +117,7 @@ class TimeStampStruct(FC2Struct):
                 ('cycleOffset', ctypes.c_uint),
                 ('reserved', ctypes.c_uint *8)]
     def __str__(self):
-        return time.strftime('%Y%m%d %H%M%S', time.localtime(ts.seconds))
+        return time.strftime('%Y%m%d %H%M%S', time.localtime(self.seconds))
 
 class CameraStatsStruct(FC2Struct):
     _fields_ = [('imageDropped', ctypes.c_uint),
@@ -182,7 +182,7 @@ class Format7InfoStruct(FC2Struct):
                 ('minPacketSize', ctypes.c_uint),
                 ('maxPacketSize', ctypes.c_uint),
                 ('percentage', ctypes.c_float),
-                ('reserved', ctypes.c_uint *8)]
+                ('reserved', ctypes.c_uint *16)]
     def __str__(self):
         rtxt = ("FORMAT7 mode %s info:\n" % self.mode)
         rtxt = rtxt + ("\tsize: %dx%d (WxH)\n" % (self.maxWidth, self.maxHeight))
