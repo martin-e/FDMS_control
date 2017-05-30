@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Fri Jul 29 15:36:01 2016
 
@@ -46,13 +45,14 @@ class FlyCapture():
     def loadLib(self, libdir):
         if not os.path.exists(libdir):
             if self.debug:
-                print("could not find directory %s" % self.libdir.__repr__())
-                print("attempt to locate Fly Capture library in default locations...")
+                print ("could not find directory %s" % self.libdir.__repr__())
+                print ("attempt to locate Fly Capture library in default locations...")
             if os.path.exists(os.path.join(os.environ['PROGRAMFILES'], 'Point Grey Research\FlyCapture2')):
                 libdir = os.path.join(os.environ['PROGRAMFILES'], 'Point Grey Research\FlyCapture2')
-                print("located %s Fly Capture library at: %s" % (self.platformInfo.bitness, libdir))
+                print ("located %s Fly Capture library at: %s" % (self.platformInfo.bitness, libdir))
             else:
-                raise FlyCaptureError("Point Grey Fly Capture SDK libraries not found")
+                from platform import architecture
+                raise FlyCaptureError("Point Grey Fly Capture SDK libraries not found for %s python. Did you install the correct version of the SDK??" % architecture()[0])
         if self.platformInfo.bitness == '32bit':
             self.fc2Path = os.path.join(libdir, 'bin\FlyCapture2.dll')
             self.fc2_cPath = os.path.join(libdir, 'bin\FlyCapture2_C.dll')
@@ -435,6 +435,7 @@ class FlyCapture():
         
     def getImageData(self, image):
         data = ctypes.string_at(image.pData, image.dataSize)
+        return data
         # imageData = np.fromstring(ctypes.string_at(image.pData, image.dataSize), dtype=np.uint8)        
         # Get a pointer to the data associated with the image. This function
         # is considered unsafe. The pointer returned could be invalidated if
@@ -454,18 +455,18 @@ class FlyCapture():
         
     def convertImageTo(self, pixelFormat, imageIn):
         # Converts the  image buffer to the specified output format and
-	# returns the result.
+    # returns the result.
         fc2ConvertImageTo = self.fc2_c.fc2ConvertImageTo
         fc2ConvertImageTo.argtypes = [ctypes.c_long, ctypes.POINTER(ImageStruct), ctypes.POINTER(ImageStruct)]
         fc2ConvertImageTo.restype = ctypes.c_int
         imageOut = ImageStruct()
-	#fc2ConvertImageTo(fc2PixelFormat format, fc2Image* pImageIn, fc2Image* pImageOut );
+    #fc2ConvertImageTo(fc2PixelFormat format, fc2Image* pImageIn, fc2Image* pImageOut );
         error = fc2ConvertImageTo(pixelFormat, ctypes.pointer(imageIn), ctypes.pointer(imageOut))
         if error:
             errDescr = errorDescription(error)
             raise FlyCaptureError("Error in converting image format: %s" % errDescr)
         return imageOut
-				
+                
     def saveImageWithOption(self, image, filename, imageFormat, option):
         # Save the image to the specified file name with the file format specified.
         optionStructs = [PNGOptionStruct, PPMOptionStruct, PGMOptionStruct, TIFFOptionStruct, JPEGOptionStruct, JPG2OptionStruct, BMPOptionStruct]
@@ -584,14 +585,18 @@ class FlyCapture():
 ## ********************************************************
 
 if __name__  == '__main__':
-    import time
+    import time, os
     
     cam = FlyCapture(libdir = '', debug = True)
     format7Mode = 0
     pixelFormat = fc2PixelFormat.FC2_PIXEL_FORMAT_MONO16.value
-    roi = [100, 400, 480, 640]  # [offset_left, offset_top, width, height]
+    roi = [0, 0, 1920, 1200]  # [offset_left, offset_top, width, height]
+    roi = [916, 510, 80, 80]   # (956, 550) ambient, vacuum pump turned on
+    roi = [1000, 384, 80, 80]   # (1040, 424) cryo pumping
+    roi = [902, 518, 80, 80]   # (956, 550) ambient, vacuum pump turned on
+    path = 'D:\FiberDimpleManufacturing'
     
-    print cam
+    print (cam)
     numCameras = cam.getNumOfCameras()
 
     print ('detected %d camera%s' % (numCameras, ((numCameras != 1)*'s')))
@@ -600,7 +605,7 @@ if __name__  == '__main__':
         index = 0 # connect to first camera
         guid = cam.getCameraFromIndex(index)
         cam.connect(guid)
-        print "found and connected camera"
+        print ("found and connected camera")
         time.sleep(1)
         cameraInfo = cam.getCameraInfo()
 
@@ -608,11 +613,11 @@ if __name__  == '__main__':
             cam.resolution = list()
             for val in cameraInfo.sensorResolution.split('x'):
                 cam.resolution.append(int(val))
-        print cameraInfo
+        # print (cameraInfo)
         
         stats = cam.getCameraStats()
-        print stats
-        print "\n\ncamera connected"
+        print (stats)
+        print ("\n\ncamera connected")
         
         if 0:
             print ("\n# listing all properties which can be set to \"auto\"")
@@ -622,9 +627,9 @@ if __name__  == '__main__':
                 propInfo = cam.getPropertyInfo(propType.value)
                 prop = cam.getProperty(propType.value)
                 if bool(propInfo.autoSupported):
-                    print propInfo
-                    print prop
-                    print "\n\n*********************\n\n"
+                    print (propInfo)
+                    print (prop)
+                    print ("\n\n*********************\n\n")
         
         if 1:
             print ("\n# disable all properties which can be set to \"auto\"")
@@ -634,24 +639,24 @@ if __name__  == '__main__':
                 propInfo = cam.getPropertyInfo(propType.value)
                 prop = cam.getProperty(propType.value)
                 if bool(propInfo.autoSupported):
-                    print("setting property %s to 0" % propType.name)
+                    # print ("setting property %s to 0" % propType.name)
                     prop.autoManualMode = 0
                     cam.setProperty(prop)
                     time.sleep(0.25)
-                    print cam.getProperty(propType.value)
-                    print "\n\n*********************\n\n"    
+                    # print (cam.getProperty(propType.value))
+                    # print ("\n\n*********************\n\n")   
         if 0:
-            print "\ngetting video format and frame rate settings:"
+            print ("\ngetting video format and frame rate settings:")
             (videoMode, frameRate) = cam.getVideoModeAndFrameRate()
             if videoMode.value == fc2VideoMode.FC2_VIDEOMODE_FORMAT7.value:
                 frameRate = cam.getProperty(fc2PropertyType.FC2_FRAME_RATE.value)
                 print ("\tvideo mode: %s\n\tframe rate: %.3f" % (videoMode.name, frameRate.absValue))
             else:
                 print ("\tvideo mode: %s\n\tframe rate: %s" % (videoMode.name, frameRate.name))
-            print("\n**********************************\n")
+            print ("\n**********************************\n")
 
         if 1:
-            frameRate = 2.5            
+            frameRate = 100            
             print ("set framerate to %.1f Hz" % frameRate)
             propType = fc2PropertyType.FC2_FRAME_RATE
             propInfo = cam.getPropertyInfo(propType.value)
@@ -660,11 +665,11 @@ if __name__  == '__main__':
             cam.setProperty(prop)
             time.sleep(0.25)
             print ("framerate is now: %.3f ms" % cam.getProperty(fc2PropertyType.FC2_FRAME_RATE.value).absValue)
-            print("\n**********************************\n")
+            print ("\n**********************************\n")
 
         if 1:
-            integrationTime = 15  # ms
-            print ("set gain to zero and integration time to %.3f ms" % integrationTime)
+            integrationTime = 0.1  # milliseconds
+            # print ("set gain to zero and integration time to %.3f ms" % integrationTime)
             propType = fc2PropertyType.FC2_SHUTTER
             propInfo = cam.getPropertyInfo(propType.value)
             prop = cam.getProperty(propType.value)
@@ -678,10 +683,10 @@ if __name__  == '__main__':
             
             print ("integration time is now: %.3f ms" % cam.getProperty(fc2PropertyType.FC2_SHUTTER.value).absValue)
             print ("gain is now: %.3f dB" % cam.getProperty(fc2PropertyType.FC2_GAIN.value).absValue)
-            print("\n**********************************\n")
+            print ("\n**********************************\n")
             
-        if 1:
-            print("listing available FORMAT7 modes:\n")
+        if 0:
+            print ("listing available FORMAT7 modes:\n")
             cam.availableFormat7Modes = list()
             for mode in fc2Mode:
                 if mode.value >= fc2Mode.FC2_NUM_MODES.value:
@@ -689,12 +694,12 @@ if __name__  == '__main__':
                 (supported, format7Info)= cam.getFormat7Info(mode.value)
                 if supported:
                     cam.availableFormat7Modes.append(mode.value)
-                    print format7Info
-                    print [ a.name for a in cam.getSupportedFormat7PixelFormats(format7Info) ]
-            print("\n**********************************\n")
+                    print (format7Info)
+                    print ([ a.name for a in cam.getSupportedFormat7PixelFormats(format7Info) ])
+            print ("\n**********************************\n")
 
-        if 0:
-            print("attempt to set FORMAT7 mode...")
+        if 1:
+            print ("attempt to set FORMAT7 mode and ROI...")
             (supported, fm7Info)= cam.getFormat7Info(format7Mode)
             fm7Settings = Format7ImageSettingsStruct()
             fm7Settings.mode = format7Mode
@@ -708,52 +713,36 @@ if __name__  == '__main__':
                 fm7Settings.offsetY = 0
                 fm7Settings.width   = fm7Info.maxWidth
                 fm7Settings.height  = fm7Info.maxHeight
-            fm7Settings.pixelFormat = fc2PixelFormat.FC2_PIXEL_FORMAT_MONO12.value
+            fm7Settings.pixelFormat = pixelFormat
             (isValid, fm7PacketInfo) = cam.validateFormat7Settings(fm7Settings)
             if isValid:
-                print fm7Settings
-                print fm7PacketInfo
+                print (fm7Settings)
+                print (fm7PacketInfo)
                 cam.setFormat7ConfigurationPacket(fm7Settings, int(fm7PacketInfo.recommendedBytesPerPacket))
-                print("Format7 mode %d settings are set." % format7Mode)
+                print ("Format7 mode %d settings are set." % format7Mode)
             else:
-                print("!!! invalid format 7 settings defined")
-            print("\n**********************************\n")
+                print ("!!! invalid format 7 settings defined")
+            print ("\n**********************************\n")
             
-        if 1:
-            print "\nstart capture"
+        if 0:
+            print ("\nstart capture of single image")
             cam.startCapture()
-            print "\ncreate image"
             image = cam.createImage()
-            time.sleep(1)
+            time.sleep(0.5)
             nw = time.localtime(time.time())
             image = cam.retrieveBuffer(image)
-            print "stop capture"
+            print ("stop capture")
             cam.stopCapture()
-        
-		# block below does not work yet!!!
-		# The statistics functions do not function properly / correct order of calling the functions is not yet known
-        if 0:
-            print "calculate image statistics"
-            context = cam.createImageStatistics()
-            cam.calculateImageStatistics(image, context)
-            channel = 1 #grey
-            st = cam.getImageStatistics(context, 1)
-            
-        if 1:
             filename = ("%04d%02d%02d%02d%02d%02d_testimage.tiff" % (nw[0], nw[1], nw[2], nw[3], nw[4], nw[5]))
             option = TIFFOptionStruct()
             option.compressionMethod = 1   # uncompressed
             print ("Saving image to %s" % filename)
             cam.saveImageWithOption(image, filename, 5, option)
-            
-        if 0:
             import numpy as np
             import matplotlib.pyplot as plt
-			# 12 bit per pixel readout is not yet supported
-            #if fc2PixelFormat(image.pixFormat).name == 'FC2_PIXEL_FORMAT_MONO12':
-            #    image2 = cam.convertImageTo(fc2PixelFormat.FC2_PIXEL_FORMAT_MONO16.value, image)
-            #    imageData = cam.getImageData(image2)
-            #else:
+            # 12 bit per pixel readout is not yet supported
+            if fc2PixelFormat(pixelFormat).name == 'FC2_PIXEL_FORMAT_MONO12':
+                raise FlyCaptureError("12 bit data readout not (yet) supported!")
             imageData = cam.getImageData(image)
             if fc2PixelFormat(image.pixFormat).name == 'FC2_PIXEL_FORMAT_MONO8':
                 dtype=np.uint8
@@ -761,15 +750,70 @@ if __name__  == '__main__':
                 dtype=np.uint16
                 
             imageArray = np.fromstring(imageData,  dtype)
-            # 12 bit per pixel readout is not yet supported
-			#if fc2PixelFormat(image.pixFormat).name == 'FC2_PIXEL_FORMAT_MONO12':
-            #    imageArray = imageArray >> 4
+            # something still needs to be constructed for converting 12 bit
             plaatje = imageArray.reshape([image.rows, image.cols])
             fh = plt.imshow(plaatje)
             cb = plt.colorbar()
             fh2= plt.figure()
             histData = plt.hist(imageArray, bins=64)
         
+        if 1:
+            print ("\nstart capture of series of images")
+            nrImages = 10000
+            import numpy as np
+            from scipy import ndimage
+            import h5py
+            # 12 bit per pixel readout is not yet supported
+            if fc2PixelFormat(pixelFormat).name == 'FC2_PIXEL_FORMAT_MONO12':
+                raise FlyCaptureError("12 bit data readout not (yet) supported!")
+
+            cam.startCapture()
+            image = cam.createImage()
+            time.sleep(0.5)
+            nw = time.localtime(time.time())
+            if fc2PixelFormat(image.pixFormat).name == 'FC2_PIXEL_FORMAT_MONO8':
+                dtype=np.uint8
+                hdfDtype = np.uint8
+            else:
+                dtype=np.uint16
+                hdfDtype = np.uint16
+            filename = ("%04d%02d%02d%02d%02d%02d_vibration.hdf5" % (nw[0], nw[1], nw[2], nw[3], nw[4], nw[5]))
+            print ("Saving image data to %s" % os.path.join(path, filename))
+            try:
+                f = h5py.File(os.path.join(path, filename), "w")
+                imageStack = f.create_dataset("images",(nrImages, fm7Settings.height, fm7Settings.width,), dtype = hdfDtype)
+                timestamps = f.create_dataset("timestamps",(nrImages,), dtype = np.float64)
+                positions = f.create_dataset("positions", (nrImages, 2), dtype = np.float32)
+            except:
+                raise FlyCaptureError("error during creating HDF5 file")
+                
+            for ii in range(nrImages):
+                image = cam.retrieveBuffer(image)
+                imageData = cam.getImageData(image)
+                imageTime = cam.getImageTimeStamp(image)
+                timestamps[ii] = np.float64(imageTime.seconds) + np.float64(imageTime.microSeconds / 1.0e6)
+                imageArray = np.fromstring(imageData, dtype)
+                imageStack[ii,...] = imageArray.reshape([fm7Settings.height, fm7Settings.width])
+                #print ("%d: %.3f - %d" % (ii, timestamps[ii]-timestamps[0], np.sum(np.sum(imageArray[...]))))
+                time.sleep(0.015)
+            numimages = ii
+            imageStack.attrs["filename"] = np.string_(filename)
+            imageStack.attrs["startTime"] = nw
+            imageStack.attrs["numImages"] = numimages
+            
+            for ii in range(numimages):
+                border = 2
+                frame = imageStack[ii,border:-border, border:-border]
+                offset = np.mean(np.mean(frame[0:10,0:10]))
+                center_of_mass = ndimage.measurements.center_of_mass(frame - offset)
+                positions[ii,...] = center_of_mass
+                et = timestamps[ii]-timestamps[0]
+                #print("%.3f: (%.3f, %.3f)" % (et, positions[ii,0], positions[ii,1]))
+            f.flush()
+            f.close()
+               
+            print ("stop capture")
+            
     if 1:
         cam.destroyContext()
         cam.unloadLib()

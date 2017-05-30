@@ -7,14 +7,18 @@ supporting module with all used structure type definitions and supporting
 functions
 """
 
-import ctypes
+import ctypes, sys
 from enum import Enum
 
 FULL_32BIT_VALUE = 0x7FFFFFFF
 MAX_STRING_LENGTH = 512
 
-class FlyCaptureError(StandardError):
-    pass
+if sys.version_info > (3,):
+    class FlyCaptureError(Exception):
+        pass
+else:
+    class FlyCaptureError(StandardError):
+        pass
 
 class FC2Struct(ctypes.Structure):
     def clone(self):
