@@ -435,7 +435,6 @@ class FlyCapture():
         
     def getImageData(self, image):
         data = ctypes.string_at(image.pData, image.dataSize)
-        return data
         # imageData = np.fromstring(ctypes.string_at(image.pData, image.dataSize), dtype=np.uint8)        
         # Get a pointer to the data associated with the image. This function
         # is considered unsafe. The pointer returned could be invalidated if
@@ -585,17 +584,14 @@ class FlyCapture():
 ## ********************************************************
 
 if __name__  == '__main__':
-    import time, os
+    import time
     
     cam = FlyCapture(libdir = '', debug = True)
     format7Mode = 0
     pixelFormat = fc2PixelFormat.FC2_PIXEL_FORMAT_MONO16.value
     roi = [0, 0, 1920, 1200]  # [offset_left, offset_top, width, height]
-    roi = [916, 510, 80, 80]   # (956, 550) ambient, vacuum pump turned on
-    roi = [1000, 384, 80, 80]   # (1040, 424) cryo pumping
-    roi = [902, 518, 80, 80]   # (956, 550) ambient, vacuum pump turned on
-    path = 'D:\FiberDimpleManufacturing'
-    
+    roi = [720, 650, 200, 200]
+	
     print (cam)
     numCameras = cam.getNumOfCameras()
 
@@ -611,9 +607,9 @@ if __name__  == '__main__':
 
         if cameraInfo.sensorResolution:
             cam.resolution = list()
-            for val in cameraInfo.sensorResolution.split('x'):
+            for val in cameraInfo.sensorResolution.decode('utf-8').split('x'):
                 cam.resolution.append(int(val))
-        # print (cameraInfo)
+        print (cameraInfo)
         
         stats = cam.getCameraStats()
         print (stats)
@@ -639,12 +635,12 @@ if __name__  == '__main__':
                 propInfo = cam.getPropertyInfo(propType.value)
                 prop = cam.getProperty(propType.value)
                 if bool(propInfo.autoSupported):
-                    # print ("setting property %s to 0" % propType.name)
+                    print ("setting property %s to 0" % propType.name)
                     prop.autoManualMode = 0
                     cam.setProperty(prop)
                     time.sleep(0.25)
-                    # print (cam.getProperty(propType.value))
-                    # print ("\n\n*********************\n\n")   
+                    print (cam.getProperty(propType.value))
+                    print ("\n\n*********************\n\n")   
         if 0:
             print ("\ngetting video format and frame rate settings:")
             (videoMode, frameRate) = cam.getVideoModeAndFrameRate()
@@ -656,10 +652,10 @@ if __name__  == '__main__':
             print ("\n**********************************\n")
 
         if 1:
-            frameRate = 100            
+            frameRate = 39            
             print ("set framerate to %.1f Hz" % frameRate)
             propType = fc2PropertyType.FC2_FRAME_RATE
-            propInfo = cam.getPropertyInfo(propType.value)
+            # propInfo = cam.getPropertyInfo(propType.value)
             prop = cam.getProperty(propType.value)
             prop.absValue = frameRate
             cam.setProperty(prop)
@@ -668,10 +664,10 @@ if __name__  == '__main__':
             print ("\n**********************************\n")
 
         if 1:
-            integrationTime = 0.1  # milliseconds
-            # print ("set gain to zero and integration time to %.3f ms" % integrationTime)
+            integrationTime = 0.038  # milliseconds
+            print ("set gain to zero and integration time to %.3f ms" % integrationTime)
             propType = fc2PropertyType.FC2_SHUTTER
-            propInfo = cam.getPropertyInfo(propType.value)
+            # propInfo = cam.getPropertyInfo(propType.value)
             prop = cam.getProperty(propType.value)
             prop.absValue = integrationTime
             cam.setProperty(prop)
@@ -814,7 +810,10 @@ if __name__  == '__main__':
             f.close()
                
             print ("stop capture")
+            
             cam.stopCapture()
+        
+            
     if 1:
         cam.destroyContext()
         cam.unloadLib()

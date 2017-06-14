@@ -1,7 +1,7 @@
 # routine for performing calibration scan
 # M. Eschen - 2016
 
-import piezo, pyflycap, time
+import labjack, pyflycap, time
 import numpy as np
 
 startV = 0   # start voltage
@@ -10,22 +10,9 @@ pausetime = 0.2
 roi = [200, 100, 480, 640]  # [offset_X, offset_Y, width, height]
 integrationTime = 20  # ms
 
+piezo = labjack.Piezo()
 
-# %%%%%%% connect to hardware %%%%%%%%%%%%%%
-# connect to labjack
-u3 = LabJackU3()
-piezo = Piezo(u3, 0)
-# connect to camera
-cam = FlyCapture(libdir = '', debug = True)
-format7Mode = 7
-pixelFormat = fc2PixelFormat.FC2_PIXEL_FORMAT_MONO16.value
-numCameras = cam.getNumOfCameras()
-if numCameras == 0:
-	raise "could not locate camera"
-guid = cam.getCameraFromIndex(index)
-cam.connect(guid)
-
-# %%%%%%% prepare arrays %%%%%%%%%%%%%%%%%%%%
+# %%%%%%% prepare arrays
 (start, end) = (piezo.voltageToBitval(startV), piezo.voltageToBitval(endV))
 bitvals = range(start, end+1)
 voltages = []
@@ -37,7 +24,20 @@ cols = roi[2]-roi[0]+1
 rows = roi[3]-roi[1]+1
 calData = np.zeros((cols, rows, len(bitvals)), dtype = uint16)
 
-# %%%%%%% configure hardware %%%%%%%%%%%%%%
+# %%%%%%% connect and configure hardware %%%%%%%%%%%%%%
+# connect to labjack
+piezo = piezo.LabJackU3(0)
+# connect to camera
+cam = FlyCapture(libdir = '', debug = True)
+format7Mode = 7
+pixelFormat = fc2PixelFormat.FC2_PIXEL_FORMAT_MONO16.value
+numCameras = cam.getNumOfCameras()
+if numCameras == 0:
+	raise "could not locate camera"
+
+guid = cam.getCameraFromIndex(index)
+cam.connect(guid)
+
 # set all properties to manual
 for propType in fc2PropertyType:
 	if propType.value > 17:

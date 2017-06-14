@@ -1,7 +1,11 @@
-import LabJackPython, u3, struct
+import LabJackPython, u3, struct, sys
 
-class LabJackError(Exception):
-    pass
+if sys.version_info > (3,):
+    class LabJackError(Exception):
+        pass
+else:
+    class LabJackError(StandardError):
+        pass
 
 def toDouble(buffer):
     """
@@ -9,11 +13,8 @@ def toDouble(buffer):
     Args: buffer, an array with 8 bytes
     Desc: Converts the 8 byte array into a floating point number.
     """
-    if type(buffer) == type(''):
-        bufferStr = buffer[:8]
-    else:
-        bufferStr = ''.join(chr(x) for x in buffer[:8])
-    dec, wh = struct.unpack('<Ii', bufferStr)
+    bufferBytes = bytes(buffer[:8])
+    dec, wh = struct.unpack('<Ii', bufferBytes)
     return float(wh) + float(dec)/2**32
 
 class LabJackU3():
@@ -21,7 +22,7 @@ class LabJackU3():
     EEPROM_ADDRESS = 0x50
     DAC_ADDRESS = 0x12
     deviceType = 3         # LabJack U3
-    def __init__(self, DACpin=u3.FIO4, DIOpin=u3.FIO6, ADCpin=u3.FIO0):
+    def __init__(self, DACpin = 4, DIOpin = 6, ADCpin = 0):
         self.U3_DAC_PIN = DACpin  # FIO5 for piezo
         self.U3_DIO_PIN = DIOpin  # FIO6 for laser pulse
         self.U3_ADC_PIN = ADCpin  # FIO0 for piezo feedback signal
@@ -50,7 +51,7 @@ class LabJackU3():
             
     def disconnect(self):
         self.device.close()
-        self.isConnected = True
+        self.isConnected = False
     
 class Piezo():
     def __init__(self, u3device, voltage = 0.0):
@@ -102,15 +103,17 @@ class Piezo():
         return voltage
 
 class Adc():
-    def __init__(self, u3device):
+    def __init__(self, u3device, numReadings = 1):
         self.u3device = u3device
+        self.numReadings = numReadings
         if not self.u3device.isConnected:
             raise LabJackError("no device connected")
     
     def readValue(self):
-        voltage = self.u3device.device.getAIN(self.u3device.U3_ADC_PIN)
-        # voltage = self.u3device.device.binaryToCalibratedAnalogVoltage(bitval[0])
-        return voltage
+		voltage = 0
+		for ii in range(self.numReadings):
+            voltage += self.u3device.device.getAIN(self.u3device.U3_ADC_PIN)
+        return voltage/float(self.numReadings)
         
 class Pulser():
     def __init__(self, u3device, dio_val = 0):
@@ -127,13 +130,14 @@ class Pulser():
         return self.u3device.device.getDIOState(self.u3device.U3_DIO_PIN)
         
     def pulse(self, length):
-        '''creates pulse on DIO pin of specified length in ms
-        up to 32 ms it is in multiples of 128 us, from 32 
-        ms it is divided in a pause in multiples of 16 ms 
-        followed by the remaining pause in multiples of 
-        128 us.
-        function returns the actual pulse length in ms'''
+        # creates pulse on DIO pin of specified length in ms
+        # up to 32 ms it is in multiples of 128 us, from 32 
+        # ms it is divided in a pause in multiples of 16 ms 
+        # followed by the remaining pause in multiples of 
+        # 128 us.
+        # function returns the actual pulse length in ms
 
+        pin = self.u3device.U3_DIO_PIN
         if length < 256*0.128:
             waitS = int(round(length/0.128))
             wait1 = u3.WaitShort(waitS)
@@ -146,8 +150,8 @@ class Pulser():
             wait1 = u3.WaitShort(waitS)
             waittime = waitL*16.384 + waitS*0.128
 
-        sethigh = u3.BitStateWrite(self.u3device.U3_DIO_PIN, 1)
-        setlow = u3.BitStateWrite(self.u3device.U3_DIO_PIN, 0)
+        sethigh = u3.BitStateWrite(pin, 1)
+        setlow = u3.BitStateWrite(pin, 0)
         if length < 256*0.128:
             self.u3device.device.getFeedback(sethigh, wait1, setlow)
         else:
