@@ -1,7 +1,11 @@
-import LabJackPython, u3, struct
+import LabJackPython, u3, struct, sys
 
-class LabJackError(Exception):
-    pass
+if sys.version_info > (3,):
+    class LabJackError(Exception):
+        pass
+else:
+    class LabJackError(StandardError):
+        pass
 
 def toDouble(buffer):
     """
@@ -47,7 +51,7 @@ class LabJackU3():
             
     def disconnect(self):
         self.device.close()
-        self.isConnected = True
+        self.isConnected = False
     
 class Piezo():
     def __init__(self, u3device, voltage = 0.0):
@@ -99,15 +103,17 @@ class Piezo():
         return voltage
 
 class Adc():
-    def __init__(self, u3device):
+    def __init__(self, u3device, numReadings = 1):
         self.u3device = u3device
+        self.numReadings = numReadings
         if not self.u3device.isConnected:
             raise LabJackError("no device connected")
     
     def readValue(self):
-        voltage = self.u3device.device.getAIN(self.u3device.U3_ADC_PIN)
-        # voltage = self.u3device.device.binaryToCalibratedAnalogVoltage(bitval[0])
-        return voltage
+		voltage = 0
+		for ii in range(self.numReadings):
+            voltage += self.u3device.device.getAIN(self.u3device.U3_ADC_PIN)
+        return voltage/float(self.numReadings)
         
 class Pulser():
     def __init__(self, u3device, dio_val = 0):
