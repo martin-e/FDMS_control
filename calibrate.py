@@ -1,7 +1,7 @@
 # routine for performing calibration scan
 # M. Eschen - 2016
 
-import piezo, pyflycap, time
+import labjack, pyflycap, time
 import numpy as np
 
 startV = 0   # start voltage
@@ -10,6 +10,7 @@ pausetime = 0.2
 roi = [200, 100, 480, 640]  # [offset_X, offset_Y, width, height]
 integrationTime = 20  # ms
 
+piezo = labjack.Piezo()
 
 # %%%%%%% prepare arrays
 (start, end) = (piezo.voltageToBitval(startV), piezo.voltageToBitval(endV))
