@@ -235,10 +235,10 @@ class PidController(Thread):
             if self._displayStatus and n > 5/self._pausetime:
                 self.printStatus()
                 n=0
+            #self.setOutput(self._output)
             self.setOutput(self._output)
-            self.setOutput(self._output)
-            n += 1
-            time.sleep(self._pausetime)
+            #n += 1
+            #time.sleep(self._pausetime)
             if self._logfile:
                 self.logStats()
         print("exiting pid control, set piezo voltage to 0.0")

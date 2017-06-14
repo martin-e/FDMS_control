@@ -729,11 +729,11 @@ if __name__  == '__main__':
             cam.startCapture()
             image = cam.createImage()
             time.sleep(0.5)
-            nw = time.localtime(time.time())
             image = cam.retrieveBuffer(image)
             print ("stop capture")
             cam.stopCapture()
-            filename = ("%04d%02d%02d%02d%02d%02d_testimage.tiff" % (nw[0], nw[1], nw[2], nw[3], nw[4], nw[5]))
+            format = '%Y%m%dT%H%M%S_testimage.tiff'
+            filename = time.strftime(format)
             option = TIFFOptionStruct()
             option.compressionMethod = 1   # uncompressed
             print ("Saving image to %s" % filename)
@@ -759,7 +759,7 @@ if __name__  == '__main__':
         
         if 1:
             print ("\nstart capture of series of images")
-            nrImages = 10000
+            nrImages = 100
             import numpy as np
             from scipy import ndimage
             import h5py
@@ -770,14 +770,15 @@ if __name__  == '__main__':
             cam.startCapture()
             image = cam.createImage()
             time.sleep(0.5)
-            nw = time.localtime(time.time())
             if fc2PixelFormat(image.pixFormat).name == 'FC2_PIXEL_FORMAT_MONO8':
                 dtype=np.uint8
                 hdfDtype = np.uint8
             else:
                 dtype=np.uint16
                 hdfDtype = np.uint16
-            filename = ("%04d%02d%02d%02d%02d%02d_vibration.hdf5" % (nw[0], nw[1], nw[2], nw[3], nw[4], nw[5]))
+            format = '%Y%m%dT%H%M%S'
+            startTime = time.localtime()
+            filename = time.strftime(format + '_vibration.hdf5', startTime)
             print ("Saving image data to %s" % os.path.join(path, filename))
             try:
                 f = h5py.File(os.path.join(path, filename), "w")
@@ -798,7 +799,7 @@ if __name__  == '__main__':
                 time.sleep(0.015)
             numimages = ii
             imageStack.attrs["filename"] = np.string_(filename)
-            imageStack.attrs["startTime"] = nw
+            imageStack.attrs["startTime"] = time.strftime(format, startTime)
             imageStack.attrs["numImages"] = numimages
             
             for ii in range(numimages):
