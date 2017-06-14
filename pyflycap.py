@@ -814,7 +814,7 @@ if __name__  == '__main__':
             f.close()
                
             print ("stop capture")
-            
+            cam.stopCapture()
     if 1:
         cam.destroyContext()
         cam.unloadLib()
