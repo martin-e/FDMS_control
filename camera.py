@@ -17,7 +17,7 @@ else:
         pass
 
 class Camera():
-    def __init__(self, camera_ini, libdir = '', debug = True):
+    def __init__(self, camera_ini, libdir = '', debug = False):
         self.connectCam(libdir, debug)
         self.prepareSettings(camera_ini)
 

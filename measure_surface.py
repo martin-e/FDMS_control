@@ -56,12 +56,13 @@ class Phase_stepping():
             setpoints.append(self.piezo_ini['offset'] + ii*self.phase_stepping_ini['stepSize'])
         for ii in range(self.phase_stepping_ini['nrSteps']):
             self.ctrl.setSetpoint(setpoints[ii])
-            time.sleep(0.08)
+            time.sleep(0.2)
             pvs.append(self.ctrl.getPv())
             logging.debug('PID setpoint: %.4f current position: %.4f' % (setpoints[ii], pvs[-1]))
-            if (setpoints[ii] - pvs[-1]) > self.piezo_ini['maxError']:        
-                logging.warning('current position deviates more from setpoint than tolerated!')
-                print('current position deviates more from setpoint than tolerated!')
+            if abs(setpoints[ii] - pvs[-1]) > self.piezo_ini['maxError']:        
+                msg = 'current position %f deviates more from setpoint %f than tolerated!' % (pvs[-1], setpoints[ii])
+                logging.warning(msg)
+                print(msg)
             # record number of images and store in hdf5 file
             for jj in range(self.phase_stepping_ini['nrImages']):
                 imageData = self.cam.getImageData(image)
@@ -84,7 +85,7 @@ class Phase_stepping():
         logging.debug('closed hdf5 file')
         self.cam.stopCapture()
     
-    def analyzeSurfaceProfile(self, filename):
+    def analyzeSurface(self, filename):
         logging.info('starting analysis of file %s'  % os.path.split(filename)[1])
         if not os.path.exist(filename):
             logging.error('file %s not found for analysis' % filename)

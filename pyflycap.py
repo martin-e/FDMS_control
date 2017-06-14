@@ -435,6 +435,7 @@ class FlyCapture():
         
     def getImageData(self, image):
         data = ctypes.string_at(image.pData, image.dataSize)
+        return data
         # imageData = np.fromstring(ctypes.string_at(image.pData, image.dataSize), dtype=np.uint8)        
         # Get a pointer to the data associated with the image. This function
         # is considered unsafe. The pointer returned could be invalidated if
@@ -450,7 +451,7 @@ class FlyCapture():
         error = fc2GetImageData(ctypes.pointer(image), ctypes.pointer(data))
         if error:
             errDescr = errorDescription(error)
-            raise FlyCaptureError("Error in setting Format7 configuration: %s" % errDescr)
+            raise FlyCaptureError("Error in getting image data: %s" % errDescr)
         
     def convertImageTo(self, pixelFormat, imageIn):
         # Converts the  image buffer to the specified output format and

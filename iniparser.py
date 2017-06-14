@@ -11,8 +11,13 @@ def parseInifile(file):
     parser = ConfigParser()
     parser.read(file)
     logging.debug('read ini settings')
+
+    fdms = dict()
+    bools = ('MEASURE_SURFACE', 'SHOOT_DIMPLE')
+    for option in bools:
+        fdms[option] = parser.getboolean('fdms', option)
     
-    # # this section starts all connections
+    # this section starts all connections
     # piezo pid control
     piezo = dict()
     floats = ('offset', 'pvperfringe', 'pvmin', 'pvmax', 'maxError', )
@@ -64,5 +69,5 @@ def parseInifile(file):
     for option in ints:
         dimple_shooting[option] = int(parser.get('dimple_shooting', option))
 
-    return piezo, camera, phase_stepping, dimple_shooting, powermeter, awg
+    return fdms, piezo, camera, phase_stepping, powermeter, awg, dimple_shooting
     

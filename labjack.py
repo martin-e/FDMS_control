@@ -110,8 +110,8 @@ class Adc():
             raise LabJackError("no device connected")
     
     def readValue(self):
-		voltage = 0
-		for ii in range(self.numReadings):
+        voltage = 0
+        for ii in range(self.numReadings):
             voltage += self.u3device.device.getAIN(self.u3device.U3_ADC_PIN)
         return voltage/float(self.numReadings)
         

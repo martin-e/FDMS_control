@@ -44,7 +44,14 @@ class PidController(Thread):
             self.setPid(pid)
         if debug:
             self._displayStatus = True
-    
+
+    def __del__(self):
+        try:
+            self.terminate()
+            self._u3.disconnect()
+        finally:
+            pass
+
     def __str__(self):
         return self.__repr__()
         
@@ -227,13 +234,6 @@ class PidController(Thread):
         finally:
             self.lock.release()
         return output
-    
-    def __del__(self):
-        try:
-            self.terminate()
-            self._u3.disconnect()
-        finally:
-            pass
         
 if __name__ == '__main__':
     import labjack
