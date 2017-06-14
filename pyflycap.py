@@ -607,7 +607,7 @@ if __name__  == '__main__':
 
         if cameraInfo.sensorResolution:
             cam.resolution = list()
-            for val in cameraInfo.sensorResolution.split('x'):
+            for val in cameraInfo.sensorResolution.decode('utf-8').split('x'):
                 cam.resolution.append(int(val))
         print (cameraInfo)
         

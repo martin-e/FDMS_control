@@ -5,10 +5,19 @@ Created on Fri Oct 21 14:16:02 2016
 @author: eschenm
 """
 
-import time
+import time, logging
+import labjack
 from threading import Thread
 from threading import Lock
 
+def connectU3():
+    u3 = labjack.LabJackU3()
+    logging.debug('connected labjeck U3')
+    u3.piezo = labjack.Piezo(u3)
+    u3.adc = labjack.Adc(u3)
+    u3.pulser = labjack.Pulser(u3)
+    # include averaging of position readings
+    return u3
 
 class PidController(Thread):    
     def __init__(self, u3, pid = None, setpoint = 0.0, ovMin = 0.0, ovMax=10.0, pausetime = 0.1, debug = False):
