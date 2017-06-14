@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """
+Class for performing measurements on and analysis of surfaces
 Created on Mon Jun 12 12:08:32 2017
 
 @author: eschenm
@@ -24,8 +25,6 @@ class Phase_stepping():
         self.cam = cam
         self.ctrl = ctrl
         self.datapath = datapath
-    
-
 
     def recordSurface(self):
         self.cam.startCapture()

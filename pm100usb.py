@@ -19,6 +19,7 @@ class Pm100usb():
         self.resourceString = 'USB?*::0x1313::0x8072::?*::INSTR'
         self.pm100usb_ini = pm100usb_ini
         self.isConnected = False
+        self.isConfigured = False
         if resourceName:
             self.resourceString = resourceName
         self.rm = pyvisa.ResourceManager()
@@ -90,6 +91,7 @@ class Pm100usb():
         self.pm100usb.write('SENS:POW:REF:STAT OFF')  # no 
         self.pm100usb.write('INPUT:THER:ACCELERATOR OFF')
         self.pm100usb.write('CONF:POW')  #prepare for power measurement
+        self.isConfigured = True
         logging.debug('powermeter configured for use')
 
     def readPower(self):

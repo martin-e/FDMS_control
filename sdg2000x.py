@@ -5,11 +5,7 @@ NI VISA library. Using the appropriate connection string
 either USB or LAN can be used. By default, a single device
 connected via USB will be interfaced. '''
 
-import pyvisa
-import sys
-import struct
-import time
-import logging
+import pyvisa, sys, struct, time, logging
 
 if sys.version_info > (3,):
     class AwgError(Exception):
@@ -19,13 +15,11 @@ else:
         pass
 
 class Sdg2000x():
-    # define constants
-    # hardcoded connection string which assumes only a single AWG is detected
-
     def __init__(self, awg_ini, resourceName='', ):
         self.awg_ini = awg_ini
         self.resourceString = 'USB?*::0xF4EC::0xEE38::?*::INSTR'
         self.isConnected = False
+        self.isArmed = False
         if resourceName:
             self.resourceString = resourceName
         self.rm = pyvisa.ResourceManager()
@@ -117,11 +111,19 @@ class Sdg2000x():
         self.awgDev.write('C%d:BTWV GATE_NCYC, NCYC' % self.awg_ini['channel'])
         self.awgDev.write('C%d:BTWV TIME, %d' % (self.awg_ini['channel'], cycles))
         self.setOutput(self.awg_ini['channel'], True)
+        self.isArmed = True
+        self.duration = cycles * period
         logging.info('AWG armed: period=%.5Es, width=%.5Es, height=%.4E, cycles=%d' % (period, width, height, cycles))
 
     def sendBurst(self):
+        if not self.isArmed:
+            raise awgError('awg is not armed')
         self.awgDev.write('C%d:BTWV MTRIG' % self.awg_ini['channel'])
         logging.info('triggered AWG')
+        time.sleep(self.duration)
+        self.setOutput(self.awg_ini['channel'], False)
+        self.isArmed = False
+        logging.info('disarmed AWG')
 
     def setOutput(self, channel, state):
         if type(state) is not bool:

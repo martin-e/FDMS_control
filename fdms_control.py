@@ -26,7 +26,10 @@ if not os.path.exists(datapath):
 
 logger.startLogger(logPath=datapath, level = LOGLEVEL)
 
-(piezo_ini, camera_ini, phase_stepping_ini, dimple_shooting_ini, powermeter_ini, awg_ini) = parseInifile(INIFILE)
+def loadIni():
+	(piezo_ini, camera_ini, phase_stepping_ini, dimple_shooting_ini, powermeter_ini, awg_ini) = parseInifile(INIFILE)
+
+loadIni()
 
 u3 = pidControl.connectU3()
 parameters = {'pid': piezo_ini['pid'],
@@ -52,7 +55,6 @@ logging.info('all hardware now connected')
 # measure_surface = measure_surface.Phase_stepping(piezo_ini, phase_stepping_ini, cam, ctrl, datapath)
 # create dimple shooting class instance :
 #    dimple = dimple_shooting.ShootDimple(dimple_shooting_ini, awg, powermeter)
-
 
 def stopFdms():
     # closing connections
