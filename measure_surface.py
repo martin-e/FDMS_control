@@ -85,37 +85,3 @@ class Phase_stepping():
         logging.debug('closed hdf5 file')
         self.cam.stopCapture()
     
-    def analyzeSurface(self, filename):
-        logging.info('starting analysis of file %s'  % os.path.split(filename)[1])
-        if not os.path.exist(filename):
-            logging.error('file %s not found for analysis' % filename)
-            raise MeasureSurfaceError('file %s not found for analysis' % filename)
-        try:
-            f=open(filename)
-        except:
-            logging.error('could not open file %s' % filename)
-            raise MeasureSurfaceError('could not open file %s' % filename)
-
-        f.close()
-
-        '''
-        source: Wyant_Phase-Shifting-Interferometry.pdf
-        
-        phase for four phase steps:
-        phase_4 = atan((-img[1] + img[3]) / (img[0] - img[2]))
-        contrast_4 = sqrt(2)*(((img[0] - img[2])**2) + (img[1] - img[3])**2) / (img[0] + img[1] + img[2] + img[3])
-        phase for five phase steps:
-        phase_5 = atan(7*(img[1] - img[3]) / (-4*img[0] + img[1] + 6*img[2] + img[3] - 4*img[4])
-        contrast_5 = sqrt(49*(img[1] - imgimg[3])**2 + (-4*img[0] + img[1] + 6*img[2] + img[3] -4*img[4])**2) / (2*img[0] + 3*img[1] + 4*img[2] + 3*img[3] + 2*img[4])
-        phase for five phase steps:
-        phase_5 = atan(7*(img[1] - img[3]) / (-4*img[0] + img[1] + 6*img[2] + img[3] - 4*img[4])
-        contrast_5 = sqrt(49*(img[1] - img[3])**2 + (-4*img[0] + img[1] + 6*img[2] + img[3] -4*img[4])**2) / (2*img[0] + 3*img[1] + 4*img[2] + 3*img[3] + 2*img[4])
-        Schwider-Hariharan for five steps:
-        phase_5_SH = atan(-(2*(img[1] - img[2])) / (img[0] - 2*img]2] + img[4]))
-        contrast_5_SH = 2*sqrt(4*(img[1] - img[3])**2 + (img[0] -2*img[2] + img[4])**2) / (img[0] + 2*(img[1] + img[2] + img[3]) + img[4])
-        phase for six phase steps:
-        phase_6 = atan(img[] img[] img[] img[] img[] img[] )
-        phase for seven phase steps:
-        phase_7 = atan((4*(img[1] - 2*img[3] + img[5])) / (-img[0] + 7*img[2] - 7*img[4] + img[6]))
-
-        '''

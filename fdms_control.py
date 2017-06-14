@@ -6,6 +6,7 @@ M. Eschen - (C) 2017
 
 import time, sys, os, logging
 import logger
+import analyze_surface
 
 from iniparser import parseInifile
 
@@ -34,6 +35,8 @@ logger.startLogger(logPath=datapath, level = LOGLEVEL)
 MEASURE_SURFACE = fdms_ini['MEASURE_SURFACE']
 SHOOT_DIMPLE = fdms_ini['SHOOT_DIMPLE']
 
+analyzer = analyze_surface.AnalyzeSurface(datapath)
+
 if MEASURE_SURFACE:
     import camera, pidControl, measure_surface
 
@@ -55,7 +58,6 @@ if MEASURE_SURFACE:
             raise FdmsError('piezo not at setpoint after initialisation')
         time.sleep(0.1)
     
-    
     cam = camera.Camera(camera_ini)
     
     measure = measure_surface.Phase_stepping(piezo_ini, phase_stepping_ini, cam, ctrl, datapath)
@@ -69,13 +71,12 @@ if SHOOT_DIMPLE:
     
     shoot = dimple_shooting.DimpleShooting(powermeter_ini, awg_ini, dimple_shooting_ini, powermeter, awg)
     
-
-    logging.info('all hardware now connected')
-
+    msg = 'all hardware now connected'
+    logging.info(msg)
+    print(msg)
 
 # create dimple shooting class instance :
 #    dimple = dimple_shooting.ShootDimple(dimple_shooting_ini, awg, powermeter)
-
 
 def stopFdms():
     # closing connections
