@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Top level file for recording
-M. Eschen - (C) 2017
+Top level file for FIBER DIMPLE MANUFACTUING SETUP control
+
+Using this sofware the setup can either measure the profile of a fiber or 
+fire a controlled laser pulse onto the fiber.
+
+(Copyright) M. Eschen - 2017
 """
 
 import time, sys, os, logging
