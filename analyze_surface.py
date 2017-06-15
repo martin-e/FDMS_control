@@ -77,17 +77,18 @@ class AnalyzeSurface():
             denom = (img[0,...] + 2*(img[1,...] + img[2,...] + img[3,...]) + img[4,...])
             contrast =  nom / denom
 
-        fig1 = mpl.pyplot.imshow(contrast)
+        mpl.pyplot.imshow(contrast);mpl.pyplot.colorbar()
         mpl.pyplot.title('contrast of %s' % os.path.split(filepath)[1])
-        fig2 = mpl.pyplot.imshow(phase)
+        mpl.pyplot.imshow(phase);mpl.pyplot.colorbar()
         mpl.pyplot.title('phase of %s' % os.path.split(filepath)[1])
         height = np.unwrap(phase) * self.wavelength / 2
-        fig3 = mpl.pyplot.imshow(height)
-        mpl.pyplot.title('height of %s' % os.path.split(filepath)[1])
+        mpl.pyplot.imshow(height);mpl.pyplot.colorbar()
+        mpl.pyplot.title('height (in m) of %s' % os.path.split(filepath)[1])
 
-
-        #self.close()
-        #self.filepath = ''
+        self.f.close()
+        result = {'contrast':contrast, 'phase':phase, 'height':height}
+        return result
+        
         '''
         source: Wyant_Phase-Shifting-Interferometry.pdf
         

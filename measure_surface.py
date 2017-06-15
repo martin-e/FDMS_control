@@ -29,7 +29,7 @@ class Phase_stepping():
     def recordSurface(self):
         self.cam.startCapture()
         time.sleep(0.1)
-        image = self.cam.retrieveBuffer(image)
+        image = self.cam.retrieveBuffer()
         pixformat = image.getPixelFormat()
         if pixformat == PyCapture2.PIXEL_FORMAT.MONO8:
             dtype=np.uint8
@@ -45,7 +45,7 @@ class Phase_stepping():
             logging.error(msg)
             raise MeasureSurfaceError(msg)
 
-            filename = time.strftime('%Y%m%dT%H%M%S_interferograms.hdf5')
+        filename = time.strftime('%Y%m%dT%H%M%S_interferograms.hdf5')
         HDF5_FILE = os.path.join(self.datapath, filename)
         logging.info('Saving image data to %s' % HDF5_FILE)
         print('Saving image data to %s' % HDF5_FILE)
@@ -77,7 +77,7 @@ class Phase_stepping():
                 imageArray = np.fromstring(data, dtype)
                 imageStack[ii,jj,...] = imageArray.reshape([self.cam.fm7Settings.height, self.cam.fm7Settings.width])
                 timeStampStack[ii,jj] = cam.getImageTimestamp(image)
-            logging.debug('recorded %d images at step %d' % (jj, ii))         
+            logging.debug('recorded %d images at step %d' % (jj+1, ii+1))         
     
         # set pid controller back to start position
         self.ctrl.setSetpoint(self.piezo_ini['offset'])
@@ -86,8 +86,8 @@ class Phase_stepping():
         imageStack.attrs['filename'] = np.string_(filename)
         imageStack.attrs['setpoints'] = setpoints
         imageStack.attrs['pvs'] = pvs
-        imageStack.attrs['numSteps'] = ii
-        imageStack.attrs['numImages'] = jj
+        imageStack.attrs['numSteps'] = ii+1
+        imageStack.attrs['numImages'] = jj+1
         
         f.flush()
         f.close()
