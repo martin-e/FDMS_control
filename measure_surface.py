@@ -9,7 +9,7 @@ Created on Mon Jun 12 12:08:32 2017
 import logging, sys, os, time, h5py
 import numpy as np
 
-import pyflycap
+import PyCapture2
 
 if sys.version_info > (3,):
     class MeasureSurfaceError(Exception):
@@ -28,24 +28,31 @@ class Phase_stepping():
 
     def recordSurface(self):
         self.cam.startCapture()
-        image = self.cam.createImage()
         time.sleep(0.1)
         image = self.cam.retrieveBuffer(image)
-        if pyflycap.fc2PixelFormat(image.pixFormat).name == 'FC2_PIXEL_FORMAT_MONO8':
+        pixformat = image.getPixelFormat()
+        if pixformat == PyCapture2.PIXEL_FORMAT.MONO8:
             dtype=np.uint8
             hdfDtype = dtype
-            #hdfDtype = 'i8'
-        else:
+        elif pixformat == PyCapture2.PIXEL_FORMAT.MONO16:
             dtype=np.uint16
             hdfDtype = dtype
-            # hdfDtype = 'i16'
-        filename = time.strftime('%Y%m%dT%H%M%S_interferograms.hdf5')
+        else:
+            for format in dir(PyCapture2.PIXEL_FORMAT):
+                if getattr(PyCapture2.PIXEL_FORMAT, format) == pixformat:
+                    break
+            msg = 'unsupported image format: %s' % format
+            logging.error(msg)
+            raise MeasureSurfaceError(msg)
+
+            filename = time.strftime('%Y%m%dT%H%M%S_interferograms.hdf5')
         HDF5_FILE = os.path.join(self.datapath, filename)
         logging.info('Saving image data to %s' % HDF5_FILE)
         print('Saving image data to %s' % HDF5_FILE)
         try:
             f = h5py.File(HDF5_FILE, "w")
-            imageStack = f.create_dataset("images",(self.phase_stepping_ini['nrSteps'], self.phase_stepping_ini['nrImages'], self.cam.fm7Settings.height, self.cam.fm7Settings.width,), dtype = hdfDtype)
+            imageStack = f.create_dataset("images",(self.phase_stepping_ini['nrSteps'], self.phase_stepping_ini['nrImages'], image.getRows(), image.getCols()), dtype = hdfDtype)
+            timeStampStack = f.create_dataset("timestamps",(self.phase_stepping_ini['nrSteps'], self.phase_stepping_ini['nrImages']), dtype = np.float64)
         except:
             logging.error('could not open hdf5 file %s' % HDF5_FILE)
             raise MeasureSurfaceError('error during creating HDF5 file')
@@ -65,9 +72,11 @@ class Phase_stepping():
                 print(msg)
             # record number of images and store in hdf5 file
             for jj in range(self.phase_stepping_ini['nrImages']):
-                imageData = self.cam.getImageData(image)
-                imageArray = np.fromstring(imageData, dtype)
+                image = self.cam.retrieveBuffer()
+                data = self.cam.getImageData(image)
+                imageArray = np.fromstring(data, dtype)
                 imageStack[ii,jj,...] = imageArray.reshape([self.cam.fm7Settings.height, self.cam.fm7Settings.width])
+                timeStampStack[ii,jj] = cam.getImageTimestamp(image)
             logging.debug('recorded %d images at step %d' % (jj, ii))         
     
         # set pid controller back to start position
