@@ -38,8 +38,7 @@ SHOOT_DIMPLE = fdms_ini['SHOOT_DIMPLE']
 analyzer = analyze_surface.AnalyzeSurface(datapath)
 
 if MEASURE_SURFACE:
-    import pidControl, measure_surface
-    import camera2 as camera
+    import camera, pidControl, measure_surface
 
     logging.info('setting up connections for measuring surface')
     u3 = pidControl.connectU3()
