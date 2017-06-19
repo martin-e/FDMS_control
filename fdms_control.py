@@ -24,7 +24,7 @@ else:
 INIFILE = 'fdms.ini'
 LOGLEVEL = logging.DEBUG
 
-datapath = '.\data'  #this is the dir in which daily dirs are created
+datapath = 'D:\FiberDimpleManufacturing\data'  #this is the dir in which daily dirs are created
 today = time.strftime('%Y%m%d')
 datapath = os.path.join(datapath, today)
 if not os.path.exists(datapath):

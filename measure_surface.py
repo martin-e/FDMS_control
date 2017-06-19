@@ -76,7 +76,7 @@ class Phase_stepping():
                 data = self.cam.getImageData(image)
                 imageArray = np.fromstring(data, dtype)
                 imageStack[ii,jj,...] = imageArray.reshape([self.cam.fm7Settings.height, self.cam.fm7Settings.width])
-                timeStampStack[ii,jj] = cam.getImageTimestamp(image)
+                timeStampStack[ii,jj] = self.cam.getImageTimestamp(image)
             logging.debug('recorded %d images at step %d' % (jj+1, ii+1))         
     
         # set pid controller back to start position

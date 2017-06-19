@@ -25,7 +25,7 @@ class AnalyzeSurface():
         if os.path.isfile(filename):
             filepath = os.path.realpath(filename)
         else:
-            filepath = os.path.realpath(os.path.join(datapath, filename))
+            filepath = os.path.realpath(os.path.join(self.datapath, filename))
         if not os.path.isfile(filepath):
             logging.error('file %s not found for analysis' % filepath)
             raise AnalyzeError('file %s not found for analysis' % filepath)
