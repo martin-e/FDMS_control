@@ -68,6 +68,5 @@ def parseInifile(file):
         dimple_shooting[option] = float(parser.get('dimple_shooting', option))
     for option in ints:
         dimple_shooting[option] = int(parser.get('dimple_shooting', option))
-
-    return fdms, piezo, camera, phase_stepping, powermeter, awg, dimple_shooting
     
+    return fdms, piezo, camera, phase_stepping, powermeter, awg, dimple_shooting

@@ -8,7 +8,6 @@ Created on Mon Jun 12 12:08:32 2017
 
 import logging, sys, os, time, h5py
 import numpy as np
-
 import PyCapture2
 
 if sys.version_info > (3,):
@@ -27,7 +26,15 @@ class Phase_stepping():
         self.datapath = datapath
 
     def recordSurface(self):
-        self.cam.startCapture()
+        try:
+            self.cam.startCapture()
+        except PyCapture2.Fc2error as err:
+            if sys.version_info > (3,):
+                msg = 'Error from camera: %s' % err.decode()
+            else:
+                msg = 'Error from camera: %s' % err
+            logging.warning(msg)
+            print(msg)
         time.sleep(0.1)
         image = self.cam.retrieveBuffer()
         pixformat = image.getPixelFormat()
@@ -63,7 +70,8 @@ class Phase_stepping():
             setpoints.append(self.piezo_ini['offset'] + ii*self.phase_stepping_ini['stepSize'])
         for ii in range(self.phase_stepping_ini['nrSteps']):
             self.ctrl.setSetpoint(setpoints[ii])
-            time.sleep(0.2)
+            time.sleep(0.25)
+            self.waitForPosition(0.5)
             pvs.append(self.ctrl.getPv())
             logging.debug('PID setpoint: %.4f current position: %.4f' % (setpoints[ii], pvs[-1]))
             if abs(setpoints[ii] - pvs[-1]) > self.piezo_ini['maxError']:        
@@ -94,3 +102,17 @@ class Phase_stepping():
         logging.debug('closed hdf5 file')
         self.cam.stopCapture()
     
+    def waitForPosition(self, timeout=10):
+        start = time.time()
+        timeout = True
+        while time.time() < (start + timeout):
+            if self.ctrl.getError() > self.piezo_ini['maxError']:
+                time.sleep(0.020)
+            else:
+                timeout = False
+                break
+        if timeout:
+            msg = 'timeout while waiting for PID controller to reach position'
+            print(msg)
+            logging.warning(msg)
+            

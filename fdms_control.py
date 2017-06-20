@@ -10,9 +10,8 @@ fire a controlled laser pulse onto the fiber.
 
 import time, sys, os, logging
 import logger
-import analyze_surface
-
 from iniparser import parseInifile
+from analyze_surface import *
 
 if sys.version_info > (3,):
     class FdmsError(Exception):
@@ -34,12 +33,11 @@ if not os.path.exists(datapath):
 logger.startLogger(logPath=datapath, level = LOGLEVEL)
 
 (fdms_ini, piezo_ini, camera_ini, phase_stepping_ini, \
- powermeter_ini, awg_ini, dimple_shooting_ini) =  parseInifile(INIFILE)
+ powermeter_ini, awg_ini, dimple_shooting_ini) = \
+  parseInifile(INIFILE)
 
 MEASURE_SURFACE = fdms_ini['MEASURE_SURFACE']
 SHOOT_DIMPLE = fdms_ini['SHOOT_DIMPLE']
-
-analyzer = analyze_surface.AnalyzeSurface(datapath)
 
 if MEASURE_SURFACE:
     import camera, pidControl, measure_surface
@@ -87,20 +85,35 @@ def stopFdms():
     logging.info('shutting down application')
     if MEASURE_SURFACE:
         try:
+            global ctrl
             ctrl.terminate()
             del ctrl
         finally:
-            pass
+            logging.debug('pid loop stopped')
+
         try:
+            global u3
+            u3.disconnect()
+            del u3
+            logging.debug('labjack disconnected')
+        finally:
+            pass
+
+        try:
+            global cam
             cam.close()
         finally:
             pass
+        
     if SHOOT_DIMPLE:
         try:
+            global powermeter
             powermeter.close()
         finally:
             pass
+        
         try:
+            global awg
             awg.close()
         finally:
             pass
