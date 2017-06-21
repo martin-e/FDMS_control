@@ -8,9 +8,13 @@ Created on Wed Jun 14 20:20:37 2017
 import os, sys, h5py, logging
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import scipy.optimize as opt
 from skimage.restoration import unwrap_phase
+from twoD_Gaussian import twoD_GaussianWithTilt
+from scipy.ndimage.measurements import center_of_mass
 
-analysis_wavelenth = 630E-9
+analysis_wavelenth = 635E-9
 
 class fdmsImage():
     def __init__(self, filename):
@@ -30,7 +34,7 @@ class fdmsImage():
         logging.debug('start analysis of file %s' % filename)
         if os.path.isfile(filename):
             filepath = os.path.realpath(filename)
-        if not os.path.isfile(filepath):
+        else:
             logging.error('file %s not found for analysis' % filepath)
             raise Exception('file %s not found for analysis' % filepath)
         logging.info('reading file %s'  % filepath)
@@ -60,7 +64,7 @@ class fdmsImage():
         Calculates height profile from stored surface interferogram.
         useNrOfSteps=N  specify if only the first N images are to be used for 
                         analysis
-        roi=(L,R,W,H)   specify ROI as (left, right, width, height) Default is 
+        roi=(T,L,H,W)   specify ROI as (left, top, width, height) Default is 
                         whole image
         scale=F         dimension of image pixel in the fiber plane. Default is 
                         117 nm with the Mitutoyo 50X and 200 mm tube lens and 
@@ -90,7 +94,8 @@ class fdmsImage():
             if msg:
                 logging.error(msg)
                 raise Exception(msg)
-
+        self.scale = scale
+        
         # average multiple images
         self.averagedImages = np.mean(self.images[:,0:1,...],1)  # werkt
         img = self.averagedImages
@@ -147,28 +152,48 @@ class fdmsImage():
         # look at Tomas's plot
         
         self.height = self.unwrapped_phase/(np.pi*2) * analysis_wavelenth/2 * 1e6
+        # correct for sign
+        self.height = -1 * self.height
 
-    def plotInterferograms(self):
+    def plotInterferograms(self, interpolation="none"):
         if sys.version_info > (3,):
             filename = self.filename.decode()
         else:
             filename = self.filename
         plt.figure()
-        for ii in range(self.numStepAnalysis):
-            plt.subplot(3,3, ii+1)
-            plt.imshow(self.averagedImages[ii,...], cmap='gray')
-        plt.subplot(3,3, 2)
+        for ii in range(self.numSteps):
+            plt.subplot(2,4, ii+1)
+            plt.imshow(self.averagedImages[ii,...], cmap='gray', interpolation=interpolation)
+#            gca().add_patch(patches.Rectangle( (100, 200),300,400,
+#                                fill=False, linestyle='dashed'))
+        plt.subplot(2, 4, 2)
         plt.title(filename)
+        if self.numSteps > self.numStepAnalysis:
+            for ii in range(self.numStepAnalysis, self.numSteps):
+                plt.subplot(2, 4, ii+1)
+                plt.title('unused')
 
-    def _plotData(self, data, label):
+    def _plotData(self, data, label, interpolation="none"):
         if sys.version_info > (3,):
             filename = self.filename.decode()
         else:
             filename = self.filename
         plt.figure()
-        plt.imshow(data)
+        shape = np.shape(data)
+        extentX = self.scale*1e6 * np.array((0., shape[1]))
+        extentX -= np.mean(extentX)
+        extentY = self.scale*1e6 * np.array((0., shape[0]))
+        extentY -= np.mean(extentY)
+        extent = list(extentY)
+        extent.append(extentX[0])
+        extent.append(extentX[1])
+        img = plt.imshow(data, interpolation=interpolation, extent=extent)
+        plt.xlabel('position (µm)')
+        plt.ylabel('position (µm)')
+        
         plt.colorbar()
         plt.title('%s - %s' % (label, str(filename)))
+        return img
         
     def plotContrast(self):
         contrastData = self.contrast
@@ -182,9 +207,73 @@ class fdmsImage():
         self._plotData(self.unwrapped_phase, 'unwrapped phase (rad)')
     
     def plotHeight(self):
-        self._plotData(self.height, 'height (µm)')
+        return self._plotData(self.height, 'height (µm)')
 
+    def fitGauss(self, data):
+        shape = np.shape(data)
+        x = np.linspace(0, shape[1], shape[1])
+        y = np.linspace(0, shape[0], shape[0])
+        x, y = np.meshgrid(x, y)
+        
+        # calculate initial estimages
+        # size of square for which corner intensities are averaged            
+        bs = int(shape[0]/10)
+        
+        # intensities at corners: [BL, BR, UL, UR]
+        corners = [np.mean(data[:bs,:bs]), np.mean(data[:bs,-bs:]), np.mean(data[-bs:,:bs]), np.mean(data[-bs:,-bs:])]
+        offset = np.mean(corners)
+        amplitude = np.min(data)-offset
+        theta = 0
+        # center of mass:
+        (yo, xo) = center_of_mass(-1*data)        
+        xtilt = (corners[1] - corners[0])/shape[1]/0.9
+        ytilt = (corners[2] - corners[0])/shape[0]/0.9
+        
+        detrend_params = (0, xo, yo, 60, 60, theta, offset, xtilt, ytilt)
+        trend = twoD_GaussianWithTilt((x,y), *detrend_params).reshape(shape)
+        # perform rough detrend so sigma can be estimated
+        detrended_data = data - trend
+        # fix with accurate integrals from Bastiaan
+        # See https://en.wikipedia.org/wiki/Beam_diameter
+        
+        x_sum = np.cumsum(np.mean(detrended_data-np.min(detrended_data), axis=1))
+        y_sum = np.cumsum(np.mean(detrended_data-np.min(detrended_data), axis=0))
+        x_sum /= x_sum
+        y_sum /= y_sum
 
+        sigma_x = 40
+        sigma_y = 40
+        
+        initial_guess = (amplitude, xo, yo, sigma_x, sigma_y, theta, offset, xtilt, ytilt)
+        initial_guessData = twoD_GaussianWithTilt((x, y), *initial_guess).reshape(shape)
+        
+        plt.figure()
+        img = plt.imshow(detrended_data, interpolation="none")
+        plt.colorbar()
+        plt.title('tilt removed from data (µm)')
+        
+        plt.figure()
+        img = plt.imshow(initial_guessData, interpolation="none")
+        plt.colorbar()
+        plt.title('initial guesses parameters')
+
+        popt, pcov = opt.curve_fit(twoD_GaussianWithTilt, (x, y), data.ravel(), p0=initial_guess)
+        data_fitted = twoD_GaussianWithTilt((x, y), *popt).reshape(shape)
+
+        plt.figure()
+        img = plt.imshow(data_fitted, interpolation="none")
+        plt.colorbar()
+        plt.title('fit residual (µm)')
+        
+        plt.figure()
+        img = plt.imshow(data-data_fitted, interpolation="none")
+        plt.colorbar()
+        plt.title('(data - fit)  (µm)')
+        
+        self.data_fitted = data_fitted
+        self.popt = popt
+
+        #print('found fit params: (amplitude: %3f\n\t\t(xo, yo): (%.1f, %.1f)\n\t\t(sigma_x, sigma_y): (%.2f, %.2f)\n\t\ttheta (rad): %.3f\n\t\toffset: %.3f\n\t\t(xtilt, ytilt): (%.4f, %.4f)' % popt)
         
         '''
         source: Wyant_Phase-Shifting-Interferometry.pdf
@@ -205,9 +294,10 @@ class fdmsImage():
         phase_6 = atan((-3*img[1] + 4*img[3] -img[5]) / (img[0] -4*img[2] + 3*img[4]))
         phase for seven phase steps:
         phase_7 = atan((4*(img[1] - 2*img[3] + img[5])) / (-img[0] + 7*img[2] - 7*img[4] + img[6]))
-    
         '''
 
+        
+        
 if __name__ == '__main__':
     data = 'C:\\eschenm\\03_projects\\31_Qutech\\FDMS\\data\\20170620\\20170620T101715_interferograms.hdf5'
     image = fdmsImage(data)

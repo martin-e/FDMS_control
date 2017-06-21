@@ -41,8 +41,8 @@ class Camera():
                 self._cameraInfo.resolution = [ int(a) for a in self._cameraInfo.sensorResolution.decode().split('x') ]
             else:
                 self._cameraInfo.resolution = [ int(a) for a in self._cameraInfo.sensorResolution.split('x') ]
-        msg = self._formatStorageClass(self._cameraInfo)
-        logging.info(msg)
+        for line in str(self._formatStorageClass(self._cameraInfo)):
+            logging.info(line)
         
         # preparing image statistics calculation
         self._imgStats = PyCapture2.ImageStatistics()

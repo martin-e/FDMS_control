@@ -29,10 +29,7 @@ class Phase_stepping():
         try:
             self.cam.startCapture()
         except PyCapture2.Fc2error as err:
-            if sys.version_info > (3,):
-                msg = 'Error from camera: %s' % err.decode()
-            else:
-                msg = 'Error from camera: %s' % err
+            msg = 'Error from camera: %s' % err
             logging.warning(msg)
             print(msg)
         time.sleep(0.1)

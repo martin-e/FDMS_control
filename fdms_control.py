@@ -11,7 +11,7 @@ fire a controlled laser pulse onto the fiber.
 import time, sys, os, logging
 import logger
 from iniparser import parseInifile
-from analyze_surface import *
+import analyze_surface
 
 if sys.version_info > (3,):
     class FdmsError(Exception):
@@ -88,6 +88,8 @@ def stopFdms():
             global ctrl
             ctrl.terminate()
             del ctrl
+        except:
+            pass
         finally:
             logging.debug('pid loop stopped')
 
@@ -96,12 +98,16 @@ def stopFdms():
             u3.disconnect()
             del u3
             logging.debug('labjack disconnected')
+        except:
+            pass
         finally:
             pass
 
         try:
             global cam
             cam.close()
+        except:
+            pass
         finally:
             pass
         
@@ -109,12 +115,16 @@ def stopFdms():
         try:
             global powermeter
             powermeter.close()
+        except:
+            pass
         finally:
             pass
         
         try:
             global awg
             awg.close()
+        except:
+            pass
         finally:
             pass
     
