@@ -143,7 +143,8 @@ class fdmsImage():
             wrappedPhase = self.wrappedPhase
         
         # the unwrap_phase function unwraps phase between -pi and pi
-        self.unwrapped_phase = unwrap_phase(wrappedPhase)
+        # multiply with -1 to get correct sign (dimples are negative height)
+        self.unwrapped_phase = -1*unwrap_phase(wrappedPhase)
         
         # subtrace fitted 2d flat surface (detrend)
         # perform 2d gaussean fit on residual
@@ -152,33 +153,46 @@ class fdmsImage():
         # look at Tomas's plot
         
         self.height = self.unwrapped_phase/(np.pi*2) * analysis_wavelenth/2 * 1e6
-        # correct for sign
-        self.height = -1 * self.height
-
+        
     def plotInterferograms(self, interpolation="none"):
         if sys.version_info > (3,):
             filename = self.filename.decode()
         else:
             filename = self.filename
-        plt.figure()
+        plot = plt.figure()
+        try:
+            sh = self.averagedImages.shape
+        except AttributeError:
+            msg = 'interferograms not yet averaged! Run analyzeSurface() first!'
+            print(msg)
+            logging.error(msg)
+            return
         for ii in range(self.numSteps):
             plt.subplot(2,4, ii+1)
-            plt.imshow(self.averagedImages[ii,...], cmap='gray', interpolation=interpolation)
-#            gca().add_patch(patches.Rectangle( (100, 200),300,400,
-#                                fill=False, linestyle='dashed'))
+            if hasattr(self, 'roi'):
+                plotdata = np.tile(self.averagedImages[ii,...], (1,1,3))
+                plotdata = self._drawRectangle(plotdata, self.roi, [1,0,0])
+                plt.imshow(plotdata, cmap='gray', interpolation=interpolation)
+            else:
+                plt.imshow(self.averagedImages[ii,...], cmap='gray', interpolation=interpolation)
+            # gca().add_patch(patches.Rectangle( (100, 200),300,400,
+            #                    fill=False, linestyle='dashed'))
         plt.subplot(2, 4, 2)
         plt.title(filename)
         if self.numSteps > self.numStepAnalysis:
             for ii in range(self.numStepAnalysis, self.numSteps):
                 plt.subplot(2, 4, ii+1)
                 plt.title('unused')
+        return plot
 
-    def _plotData(self, data, label, interpolation="none"):
+    def _plotData(self, data, title='', interpolation="none"):
         if sys.version_info > (3,):
             filename = self.filename.decode()
         else:
             filename = self.filename
-        plt.figure()
+        if not title:
+            title = str(filename)
+        plot = plt.figure()
         shape = np.shape(data)
         extentX = self.scale*1e6 * np.array((0., shape[1]))
         extentX -= np.mean(extentX)
@@ -187,27 +201,47 @@ class fdmsImage():
         extent = list(extentY)
         extent.append(extentX[0])
         extent.append(extentX[1])
-        img = plt.imshow(data, interpolation=interpolation, extent=extent)
+        plt.imshow(data, interpolation=interpolation, extent=extent)
         plt.xlabel('position (µm)')
         plt.ylabel('position (µm)')
-        
         plt.colorbar()
-        plt.title('%s - %s' % (label, str(filename)))
-        return img
+        plt.title(title)
+        return plot
+        
+    def _drawRectangle(self, data, roi, color):
+        # roi=(T,L,H,W)
+        from IPython import embed
+        embed()
+        # horizontal lines:
+        line1X = np.array(range(roi[0], roi[0]+roi[2]+1))
+        line1Y = roi[1] + np.zeros(line1X.shape)
+        line3X = line1X
+        line3Y = roi[1]+roi[3] + np.zeros(line3X.shape)
+        # vertical lines:
+        line2Y = np.array(range(roi[1], roi[1]+roi[3]+1))
+        line2X = roi[0] + np.zeros(line2Y.shape)
+        line4Y = line2Y
+        line4X = roi[0]+roi[2] + np.zeros(line4Y.shape)
+
+        data[line1X, line1Y, :] = color
+        data[line2X, line2Y, :] = color
+        data[line3X, line3Y, :] = color
+        data[line4X, line4Y, :] = color
+        return data
         
     def plotContrast(self):
         contrastData = self.contrast
         contrastData[contrastData > 1] = 1
-        self._plotData(contrastData, 'fringe contrast')
+        self._plotData(contrastData, title='fringe contrast')
         
     def plotPhase(self):
-        self._plotData(self.wrappedPhase, 'wrapped phase (rad)')
+        return self._plotData(self.wrappedPhase, title='wrapped phase (rad)')
         
     def plotUnwrappedPhase(self):
-        self._plotData(self.unwrapped_phase, 'unwrapped phase (rad)')
+        return self._plotData(self.unwrapped_phase, title='unwrapped phase (rad)')
     
     def plotHeight(self):
-        return self._plotData(self.height, 'height (µm)')
+        return self._plotData(self.height, title='height (µm)')
 
     def fitGauss(self, data):
         shape = np.shape(data)
@@ -224,8 +258,10 @@ class fdmsImage():
         offset = np.mean(corners)
         amplitude = np.min(data)-offset
         theta = 0
-        # center of mass:
-        (yo, xo) = center_of_mass(-1*data)        
+        #   center of mass:
+        # (yo, xo) = center_of_mass(data)
+        minpos = np.where(data == np.min(data))
+        (yo, xo) = (minpos[0][0], minpos[1][0])
         xtilt = (corners[1] - corners[0])/shape[1]/0.9
         ytilt = (corners[2] - corners[0])/shape[0]/0.9
         
@@ -245,35 +281,31 @@ class fdmsImage():
         sigma_y = 40
         
         initial_guess = (amplitude, xo, yo, sigma_x, sigma_y, theta, offset, xtilt, ytilt)
+        print(initial_guess)
         initial_guessData = twoD_GaussianWithTilt((x, y), *initial_guess).reshape(shape)
         
-        plt.figure()
-        img = plt.imshow(detrended_data, interpolation="none")
-        plt.colorbar()
-        plt.title('tilt removed from data (µm)')
+        img = self._plotData(detrended_data, title='tilt removed from data (µm)')
         
-        plt.figure()
-        img = plt.imshow(initial_guessData, interpolation="none")
-        plt.colorbar()
-        plt.title('initial guesses parameters')
+        img = self._plotData(initial_guessData, title='initial guessed parameters')
 
         popt, pcov = opt.curve_fit(twoD_GaussianWithTilt, (x, y), data.ravel(), p0=initial_guess)
         data_fitted = twoD_GaussianWithTilt((x, y), *popt).reshape(shape)
 
-        plt.figure()
-        img = plt.imshow(data_fitted, interpolation="none")
-        plt.colorbar()
-        plt.title('fit residual (µm)')
+        title = 'fitted Gauss (with tilt) (µm)\ndepth: %.2fµm, sigma: (%.3f HOR and %.3f VER)µm' % (popt[0], popt[3]*self.scale*1E6, popt[4]*self.scale*1E6)
+        img = self._plotData(data_fitted, title=title)
         
-        plt.figure()
-        img = plt.imshow(data-data_fitted, interpolation="none")
-        plt.colorbar()
-        plt.title('(data - fit)  (µm)')
+        img = self._plotData(data-data_fitted, title='fit residual  (µm)')
         
         self.data_fitted = data_fitted
         self.popt = popt
-
-        #print('found fit params: (amplitude: %3f\n\t\t(xo, yo): (%.1f, %.1f)\n\t\t(sigma_x, sigma_y): (%.2f, %.2f)\n\t\ttheta (rad): %.3f\n\t\toffset: %.3f\n\t\t(xtilt, ytilt): (%.4f, %.4f)' % popt)
+        print('found fit params: (amplitude: %.3fµm\n\t\t(xo, yo): (%.1f, %.1f) pix\n\t\t(sigma_x, sigma_y): (%.2f, %.2f) pix\n\t\ttheta: %.3f (rad)\n\t\toffset: %.3f µm\n\t\t(xtilt, ytilt): (%.4f, %.4f) (µm/image length)' % (popt[0], popt[1], popt[2], popt[3], popt[4], popt[5], popt[6], popt[7], popt[8]))
+        self.dimpleDepth = popt[0]
+        self.radiusOfCurvature = (self._roc(self.popt[3]*1E6*self.scale), self._roc(self.popt[4]*1E6*self.scale))
+        print('calculated radii of curvature: %.3f and %.3f µm' % (self._roc(sigma_x*1E6*self.scale), self._roc(sigma_y*1E6*self.scale)))
+            
+    def _roc(self, sigma):
+        radius = np.sqrt(2*np.pi) * np.power(sigma, 3)
+        return radius
         
         '''
         source: Wyant_Phase-Shifting-Interferometry.pdf
