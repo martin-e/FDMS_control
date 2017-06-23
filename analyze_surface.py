@@ -171,7 +171,7 @@ class fdmsImage():
             plt.subplot(2,4, ii+1)
             if hasattr(self, 'roi'):
                 plotdata = np.tile(self.averagedImages[ii,...], (1,1,3))
-                plotdata = self._drawRectangle(plotdata, self.roi, [1,0,0])
+                # plotdata = self._drawRectangle(plotdata, self.roi, [1,0,0])
                 plt.imshow(plotdata, cmap='gray', interpolation=interpolation)
             else:
                 plt.imshow(self.averagedImages[ii,...], cmap='gray', interpolation=interpolation)
@@ -287,7 +287,7 @@ class fdmsImage():
         data_fitted = twoD_GaussianWithTilt((x, y), *popt).reshape(shape)
         self.data_fitted = data_fitted
         self.popt = popt
-        print('found fit params: (amplitude: %.3fµm\n\t\t(xo, yo): (%.1f, %.1f) µm\n\t\t(sigma_x, sigma_y): (%.2f, %.2f) pix\n\t\ttheta: %.3f (rad)\n\t\toffset: %.3f µm\n\t\t(xtilt, ytilt): (%.4f, %.4f) (µm/image length)' % (popt[0], popt[1], popt[2], self.popt[3]*1E6*self.scale, self.popt[4]*1E6*self.scale, popt[5], popt[6], popt[7], popt[8]))
+        print('found fit params: (amplitude: %.3fµm\n\t\t(x0, y0): (%.1f, %.1f) µm\n\t\t(sigma_x, sigma_y): (%.2f, %.2f) µm\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f µm\n\t\t(xtilt, ytilt): (%.4f, %.4f) (µm/image length)' % (popt[0], popt[1], popt[2], self.popt[3]*1E6*self.scale, self.popt[4]*1E6*self.scale, popt[5]/np.pi*180, popt[6], popt[7], popt[8]))
         self.dimpleDepth = popt[0]
         self.sigma = (popt[3]*self.scale*1E6, popt[4]*self.scale*1E6)
         
