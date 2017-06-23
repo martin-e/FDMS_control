@@ -31,7 +31,7 @@ class DimpleShooting():
 
     def prepareShot(self, **kwargs):
         '''
-        optional kwargs: (period=5E-6, width=1E-6, height=5V, cycles=1)
+        optional kwargs: (period=5E-6, width=1E-6, height=5V, nr_pulses=1)
         '''
         period = kwargs.get('period', self.dimple_shooting_ini['pulse'] + self.dimple_shooting_ini['length'])
         if kwargs.get('period', None):
@@ -39,22 +39,22 @@ class DimpleShooting():
             print(msg)
             logging.debug(msg)
         
-        width = kwargs.get('width', self.dimple_shooting_ini['length'])
+        width = kwargs.get('width', self.dimple_shooting_ini['width'])
         if kwargs.get('width', None):
             msg = 'using non-standard value for pulse width: %E.3s' % width
             print(msg)
             logging.debug(msg)
 
-            cycles = int(kwargs.get('cycles', self.dimple_shooting_ini['nr_pulses']))
-        if kwargs.get('cycles', None):
-            msg = 'using non-standard value for number of pulses: %d' % int(cycles)
+            cycles = int(kwargs.get('nr_pulses', self.dimple_shooting_ini['nr_pulses']))
+        if kwargs.get('nr_pulses', None):
+            msg = 'using non-standard value for number of pulses: %d' % int(nr_pulses)
             print(msg)
             logging.debug(msg)
 
-        currentPower = self.powermeter.readPower()
+        actualPower = self.powermeter.readPower()
         height = kwargs.get('height', (currentPower / self.dimple_shooting_ini['default_power'] * self.dimple_shooting_ini['height']))
         if kwargs.get('height', None):
-            msg = 'using non-standard value for number of pulse height: %.4fV' % int(cycles)
+            msg = 'using non-standard value for number of pulse height: %.4fV' % height
             print(msg)
             logging.debug(msg)
         self.awg.prepareBurst(period, width, height, cycles)

@@ -8,11 +8,11 @@ Created on Wed Jun 14 20:20:37 2017
 import os, sys, h5py, logging
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+# import matplotlib.patches as patches
 import scipy.optimize as opt
 from skimage.restoration import unwrap_phase
 from twoD_Gaussian import twoD_GaussianWithTilt
-from scipy.ndimage.measurements import center_of_mass
+# from scipy.ndimage.measurements import center_of_mass
 
 analysis_wavelenth = 635E-9
 
@@ -96,8 +96,8 @@ class fdmsImage():
                 raise Exception(msg)
         self.scale = scale
         
-        # average multiple images
-        self.averagedImages = np.mean(self.images[:,0:1,...],1)  # werkt
+        # average multiple images taken at eacht phase step
+        self.averagedImages = np.mean(self.images[:,2:3,...],1)
         img = self.averagedImages
         if self.numStepAnalysis == 5:
             # phase
@@ -277,35 +277,32 @@ class fdmsImage():
         x_sum /= x_sum
         y_sum /= y_sum
 
-        sigma_x = 40
+        sigma_x = 40  # hardcoded, needs better quick estimation
         sigma_y = 40
         
         initial_guess = (amplitude, xo, yo, sigma_x, sigma_y, theta, offset, xtilt, ytilt)
         print(initial_guess)
         initial_guessData = twoD_GaussianWithTilt((x, y), *initial_guess).reshape(shape)
-        
-        img = self._plotData(detrended_data, title='tilt removed from data (µm)')
-        
-        img = self._plotData(initial_guessData, title='initial guessed parameters')
-
         popt, pcov = opt.curve_fit(twoD_GaussianWithTilt, (x, y), data.ravel(), p0=initial_guess)
         data_fitted = twoD_GaussianWithTilt((x, y), *popt).reshape(shape)
-
-        title = 'fitted Gauss (with tilt) (µm)\ndepth: %.2fµm, sigma: (%.3f HOR and %.3f VER)µm' % (popt[0], popt[3]*self.scale*1E6, popt[4]*self.scale*1E6)
-        img = self._plotData(data_fitted, title=title)
-        
-        img = self._plotData(data-data_fitted, title='fit residual  (µm)')
-        
         self.data_fitted = data_fitted
         self.popt = popt
-        print('found fit params: (amplitude: %.3fµm\n\t\t(xo, yo): (%.1f, %.1f) pix\n\t\t(sigma_x, sigma_y): (%.2f, %.2f) pix\n\t\ttheta: %.3f (rad)\n\t\toffset: %.3f µm\n\t\t(xtilt, ytilt): (%.4f, %.4f) (µm/image length)' % (popt[0], popt[1], popt[2], popt[3], popt[4], popt[5], popt[6], popt[7], popt[8]))
+        print('found fit params: (amplitude: %.3fµm\n\t\t(xo, yo): (%.1f, %.1f) µm\n\t\t(sigma_x, sigma_y): (%.2f, %.2f) pix\n\t\ttheta: %.3f (rad)\n\t\toffset: %.3f µm\n\t\t(xtilt, ytilt): (%.4f, %.4f) (µm/image length)' % (popt[0], popt[1], popt[2], self.popt[3]*1E6*self.scale, self.popt[4]*1E6*self.scale, popt[5], popt[6], popt[7], popt[8]))
         self.dimpleDepth = popt[0]
-        self.radiusOfCurvature = (self._roc(self.popt[3]*1E6*self.scale), self._roc(self.popt[4]*1E6*self.scale))
-        print('calculated radii of curvature: %.3f and %.3f µm' % (self._roc(sigma_x*1E6*self.scale), self._roc(sigma_y*1E6*self.scale)))
+        self.sigma = (popt[3]*self.scale*1E6, popt[4]*self.scale*1E6)
+        
+        img = self._plotData(detrended_data, title='tilt removed from data (µm)')
+        img = self._plotData(initial_guessData, title='initial guessed parameters')
+        title = 'fitted Gauss (with tilt) (µm)\ndepth: %.2fµm, sigma: (%.3f HOR and %.3f VER)µm' % (popt[0], self.sigma[0], self.sigma[1])
+        img = self._plotData(data_fitted, title=title)
+        img = self._plotData(data-data_fitted, title='fit residual  (µm)')
+        
+    #    self.radiusOfCurvature = (self._roc(self.popt[3]*1E6*self.scale), self._roc(self.popt[4]*1E6*self.scale))
+    #    print('calculated radii of curvature: %.3f and %.3f µm' % self.radiusOfCurvature)
             
-    def _roc(self, sigma):
-        radius = np.sqrt(2*np.pi) * np.power(sigma, 3)
-        return radius
+    #def _roc(self, sigma):
+    #    radius = np.sqrt(2*np.pi) * np.power(sigma, 3)
+    #    return radius
         
         '''
         source: Wyant_Phase-Shifting-Interferometry.pdf
