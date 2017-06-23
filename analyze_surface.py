@@ -170,7 +170,8 @@ class fdmsImage():
         for ii in range(self.numSteps):
             plt.subplot(2,4, ii+1)
             if hasattr(self, 'roi'):
-                plotdata = np.tile(self.averagedImages[ii,...], (1,1,3))
+                plotdata = self.averagedImages[ii,...]
+                # plotdata = np.tile(self.averagedImages[ii,...], (1,1,3))
                 # plotdata = self._drawRectangle(plotdata, self.roi, [1,0,0])
                 plt.imshow(plotdata, cmap='gray', interpolation=interpolation)
             else:
@@ -291,11 +292,12 @@ class fdmsImage():
         self.dimpleDepth = popt[0]
         self.sigma = (popt[3]*self.scale*1E6, popt[4]*self.scale*1E6)
         
-        img = self._plotData(detrended_data, title='tilt removed from data (µm)')
-        img = self._plotData(initial_guessData, title='initial guessed parameters')
-        title = 'fitted Gauss (with tilt) (µm)\ndepth: %.2fµm, sigma: (%.3f HOR and %.3f VER)µm' % (popt[0], self.sigma[0], self.sigma[1])
-        img = self._plotData(data_fitted, title=title)
-        img = self._plotData(data-data_fitted, title='fit residual  (µm)')
+        if 1:
+            img = self._plotData(detrended_data, title='tilt removed from data (µm)')
+            img = self._plotData(initial_guessData, title='initial guessed parameters')
+            title = 'fitted Gauss (with tilt) (µm)\ndepth: %.2fµm, sigma: (%.3f HOR and %.3f VER)µm' % (popt[0], self.sigma[0], self.sigma[1])
+            img = self._plotData(data_fitted, title=title)
+            img = self._plotData(data-data_fitted, title='fit residual  (µm)')
         
     #    self.radiusOfCurvature = (self._roc(self.popt[3]*1E6*self.scale), self._roc(self.popt[4]*1E6*self.scale))
     #    print('calculated radii of curvature: %.3f and %.3f µm' % self.radiusOfCurvature)
