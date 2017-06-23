@@ -93,6 +93,7 @@ class Phase_stepping():
         imageStack.attrs['pvs'] = pvs
         imageStack.attrs['numSteps'] = ii+1
         imageStack.attrs['numImages'] = jj+1
+        imageStack.attrs['wavelength'] = self.phase_stepping_ini['wavelength']
         
         f.flush()
         f.close()

@@ -14,8 +14,6 @@ from skimage.restoration import unwrap_phase
 from twoD_Gaussian import twoD_GaussianWithTilt
 # from scipy.ndimage.measurements import center_of_mass
 
-analysis_wavelenth = 635E-9
-
 class fdmsImage():
     def __init__(self, filename):
         '''
@@ -54,10 +52,11 @@ class fdmsImage():
                 self.numImages  = hdf5File['images'].attrs['numImages']
                 self.numSteps   = hdf5File['images'].attrs['numSteps']
                 self.filename   = hdf5File['images'].attrs['filename']
+                self.wavelength = getattr(hdf5File['images'], 'wavelength', 635E-9)
+
         except Exception as error:
             logging.error('error during reading file %s: %s' % (filepath, error))
             raise Exception(error)
-
 
     def analyzeSurface(self, useNrOfSteps=None, roi=None, scale=0.1172E-6):
         ''' 
@@ -152,14 +151,13 @@ class fdmsImage():
         # calculate ellipticity
         # look at Tomas's plot
         
-        self.height = self.unwrapped_phase/(np.pi*2) * analysis_wavelenth/2 * 1e6
+        self.height = self.unwrapped_phase/(np.pi*2) * self.wavelength/2 * 1e6
         
     def plotInterferograms(self, interpolation="none"):
         if sys.version_info > (3,):
             filename = self.filename.decode()
         else:
             filename = self.filename
-        plot = plt.figure()
         try:
             sh = self.averagedImages.shape
         except AttributeError:
@@ -167,23 +165,27 @@ class fdmsImage():
             print(msg)
             logging.error(msg)
             return
+        plot = plt.figure()
         for ii in range(self.numSteps):
             plt.subplot(2,4, ii+1)
             if hasattr(self, 'roi'):
                 plotdata = self.averagedImages[ii,...]
                 # plotdata = np.tile(self.averagedImages[ii,...], (1,1,3))
                 # plotdata = self._drawRectangle(plotdata, self.roi, [1,0,0])
-                plt.imshow(plotdata, cmap='gray', interpolation=interpolation)
+                plt.imshow(plotdata, cmap='gray', 
+                           interpolation=interpolation)
             else:
                 plt.imshow(self.averagedImages[ii,...], cmap='gray', interpolation=interpolation)
+            title = '#%d' % ii
+            if (self.numSteps > self.numStepAnalysis) & (ii+1 > self.numStepAnalysis):
+                title = title + ' (unused)'
+            plt.title(title)
             # gca().add_patch(patches.Rectangle( (100, 200),300,400,
             #                    fill=False, linestyle='dashed'))
-        plt.subplot(2, 4, 2)
-        plt.title(filename)
-        if self.numSteps > self.numStepAnalysis:
-            for ii in range(self.numStepAnalysis, self.numSteps):
-                plt.subplot(2, 4, ii+1)
-                plt.title('unused')
+        ax = plt.subplot(248)
+        ax.axis('off')
+        ax.text(0.05,0.95, str(filename), fontsize=11)
+        
         return plot
 
     def _plotData(self, data, title='', interpolation="none"):
@@ -195,6 +197,11 @@ class fdmsImage():
             title = str(filename)
         plot = plt.figure()
         shape = np.shape(data)
+        if 0:
+            print('\n\n\n\n******* entering embedded iPython session *******\n\n\n')
+            from IPython import embed
+            embed()
+
         extentX = self.scale*1e6 * np.array((0., shape[1]))
         extentX -= np.mean(extentX)
         extentY = self.scale*1e6 * np.array((0., shape[0]))
@@ -202,7 +209,7 @@ class fdmsImage():
         extent = list(extentY)
         extent.append(extentX[0])
         extent.append(extentX[1])
-        plt.imshow(data, interpolation=interpolation, extent=extent)
+        plt.imshow(data, interpolation=interpolation, extent=extent, aspect='auto')
         plt.xlabel('position (µm)')
         plt.ylabel('position (µm)')
         plt.colorbar()
@@ -211,6 +218,7 @@ class fdmsImage():
         
     def _drawRectangle(self, data, roi, color):
         # roi=(T,L,H,W)
+        print('\n\n\n\n******* entering embedded iPython session *******\n\n\n')
         from IPython import embed
         embed()
         # horizontal lines:
@@ -244,7 +252,9 @@ class fdmsImage():
     def plotHeight(self):
         return self._plotData(self.height, title='height (µm)')
 
-    def fitGauss(self, data):
+    def fitGauss(self, data = []):
+        if not data:
+            data = self.height
         shape = np.shape(data)
         x = np.linspace(0, shape[1], shape[1])
         y = np.linspace(0, shape[0], shape[0])
@@ -282,29 +292,52 @@ class fdmsImage():
         sigma_y = 40
         
         initial_guess = (amplitude, xo, yo, sigma_x, sigma_y, theta, offset, xtilt, ytilt)
-        print(initial_guess)
-        initial_guessData = twoD_GaussianWithTilt((x, y), *initial_guess).reshape(shape)
+        ig = initial_guess
+        shape = data.shape
+        txt = 'initial_guess: amplitude: %.3fµm\n\t\t(x0, y0): (%.1f, %.1f) µm\n\t\t(sigma_x, sigma_y): (%.2f, %.2f) µm\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f µm\n\t\t(xtilt, ytilt): (%.4f, %.4f) (µm/image length)'
+        x0 = self.scale*1e6 * (ig[1] - shape[1]/2)
+        y0 = self.scale*1e6 * (ig[2] - shape[0]/2)
+        sigma_x = ig[3]*1E6*self.scale
+        sigma_y = ig[4]*1E6*self.scale
+        theta_deg = ig[5]/np.pi*180
+
+        vals = (ig[0], x0, y0, sigma_x, sigma_y, theta_deg, ig[6], ig[7], ig[8])
+        print(txt % vals)
+        initial_guessSurf = twoD_GaussianWithTilt((x, y), *initial_guess).reshape(shape)
         popt, pcov = opt.curve_fit(twoD_GaussianWithTilt, (x, y), data.ravel(), p0=initial_guess)
         data_fitted = twoD_GaussianWithTilt((x, y), *popt).reshape(shape)
         self.data_fitted = data_fitted
         self.popt = popt
-        print('found fit params: (amplitude: %.3fµm\n\t\t(x0, y0): (%.1f, %.1f) µm\n\t\t(sigma_x, sigma_y): (%.2f, %.2f) µm\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f µm\n\t\t(xtilt, ytilt): (%.4f, %.4f) (µm/image length)' % (popt[0], popt[1], popt[2], self.popt[3]*1E6*self.scale, self.popt[4]*1E6*self.scale, popt[5]/np.pi*180, popt[6], popt[7], popt[8]))
+        
+        txt = 'found fit params: amplitude: %.3fµm\n\t\t(x0, y0): (%.1f, %.1f) µm\n\t\t(sigma_x, sigma_y): (%.2f, %.2f) µm\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f µm\n\t\t(xtilt, ytilt): (%.4f, %.4f) (µm/image length)'
+        x0 = self.scale*1e6 * (popt[1] - shape[1]/2)
+        y0 = self.scale*1e6 * (popt[2] - shape[0]/2)
+        sigma_x = popt[3]*1E6*self.scale
+        sigma_y = popt[4]*1E6*self.scale
+        theta_deg = popt[5]/np.pi*180
+        vals = (popt[0], x0, y0, sigma_x, sigma_y, theta_deg, popt[6], popt[7], popt[8])
+        
+        print(txt % vals)
         self.dimpleDepth = popt[0]
         self.sigma = (popt[3]*self.scale*1E6, popt[4]*self.scale*1E6)
         
         if 1:
             img = self._plotData(detrended_data, title='tilt removed from data (µm)')
-            img = self._plotData(initial_guessData, title='initial guessed parameters')
+            img = self._plotData(initial_guessSurf, title='initial guessed parameters')
             title = 'fitted Gauss (with tilt) (µm)\ndepth: %.2fµm, sigma: (%.3f HOR and %.3f VER)µm' % (popt[0], self.sigma[0], self.sigma[1])
             img = self._plotData(data_fitted, title=title)
             img = self._plotData(data-data_fitted, title='fit residual  (µm)')
         
-    #    self.radiusOfCurvature = (self._roc(self.popt[3]*1E6*self.scale), self._roc(self.popt[4]*1E6*self.scale))
-    #    print('calculated radii of curvature: %.3f and %.3f µm' % self.radiusOfCurvature)
+        roc_x = self._roc(popt[3]*1E6*self.scale, self.popt[0])
+        roc_y = self._roc(popt[4]*1E6*self.scale, self.popt[0])
+        self.radiiOfCurvature = (roc_x, roc_y)
+        print('calculated radii of curvature: %.3f and %.3f µm' % self.radiiOfCurvature)
             
-    #def _roc(self, sigma):
-    #    radius = np.sqrt(2*np.pi) * np.power(sigma, 3)
-    #    return radius
+    def _roc(self, sigma, depth):
+        D = 2*np.sqrt(2) * sigma
+        radius_curvature = D**2 / (8*depth)
+        #with D = full width at height of 1/e
+        return radius_curvature
         
         '''
         source: Wyant_Phase-Shifting-Interferometry.pdf

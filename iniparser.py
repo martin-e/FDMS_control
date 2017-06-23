@@ -53,7 +53,7 @@ def parseInifile(file):
 
     # reading phase stepping ini settings
     phase_stepping = dict()
-    floats = ('stepSize', )
+    floats = ('stepSize', 'wavelength', )
     ints = ('nrSteps', 'nrImages', )
     for option in floats:
         phase_stepping[option] = float(parser.get('phase_stepping', option))
