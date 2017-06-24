@@ -8,7 +8,7 @@ Created on Wed Jun 14 20:20:37 2017
 import os, sys, h5py, logging
 import numpy as np
 import matplotlib.pyplot as plt
-# import matplotlib.patches as patches
+import matplotlib.patches as patches
 import scipy.optimize as opt
 from skimage.restoration import unwrap_phase
 from twoD_Gaussian import twoD_GaussianWithTilt
@@ -165,17 +165,16 @@ class fdmsImage():
             print(msg)
             logging.error(msg)
             return
-        plot = plt.figure()
+        fig = plt.figure()
         for ii in range(self.numSteps):
-            plt.subplot(2,4, ii+1)
+            plt.subplot(2, 4, ii+1)
+            ax = plt.gca()
+            plotdata = self.averagedImages[ii,...]
+            ax.imshow(plotdata, cmap='gray', interpolation=interpolation)
             if hasattr(self, 'roi'):
-                plotdata = self.averagedImages[ii,...]
-                # plotdata = np.tile(self.averagedImages[ii,...], (1,1,3))
-                # plotdata = self._drawRectangle(plotdata, self.roi, [1,0,0])
-                plt.imshow(plotdata, cmap='gray', 
-                           interpolation=interpolation)
-            else:
-                plt.imshow(self.averagedImages[ii,...], cmap='gray', interpolation=interpolation)
+                rect = patches.Rectangle((roi[1],roi[0]),roi[3],roi[2], \
+                                         linewidth=1,edgecolor='r',facecolor='none')
+                ax.add_patch(rect)
             title = '#%d' % ii
             if (self.numSteps > self.numStepAnalysis) & (ii+1 > self.numStepAnalysis):
                 title = title + ' (unused)'
@@ -184,9 +183,15 @@ class fdmsImage():
             #                    fill=False, linestyle='dashed'))
         ax = plt.subplot(248)
         ax.axis('off')
-        ax.text(0.05,0.95, str(filename), fontsize=11)
         
-        return plot
+        if hasattr(self, 'roi'):
+            roitxt = 'ROI(X,Y,W,H): (%d,%d,%d,%d)' % (roi[1],roi[0],roi[3],roi[2])
+        else:
+            roitxt = 'no ROI defined'
+        txt = '%s\n%s\nusing %d images' % (str(filename), roitxt, self.numStepAnalysis)
+
+        ax.text(0.05,0.5, txt, fontsize=11)
+        return plt.gcf()
 
     def _plotData(self, data, title='', interpolation="none"):
         if sys.version_info > (3,):
@@ -215,28 +220,6 @@ class fdmsImage():
         plt.colorbar()
         plt.title(title)
         return plot
-        
-    def _drawRectangle(self, data, roi, color):
-        # roi=(T,L,H,W)
-        print('\n\n\n\n******* entering embedded iPython session *******\n\n\n')
-        from IPython import embed
-        embed()
-        # horizontal lines:
-        line1X = np.array(range(roi[0], roi[0]+roi[2]+1))
-        line1Y = roi[1] + np.zeros(line1X.shape)
-        line3X = line1X
-        line3Y = roi[1]+roi[3] + np.zeros(line3X.shape)
-        # vertical lines:
-        line2Y = np.array(range(roi[1], roi[1]+roi[3]+1))
-        line2X = roi[0] + np.zeros(line2Y.shape)
-        line4Y = line2Y
-        line4X = roi[0]+roi[2] + np.zeros(line4Y.shape)
-
-        data[line1X, line1Y, :] = color
-        data[line2X, line2Y, :] = color
-        data[line3X, line3Y, :] = color
-        data[line4X, line4Y, :] = color
-        return data
         
     def plotContrast(self):
         contrastData = self.contrast
@@ -302,7 +285,7 @@ class fdmsImage():
         theta_deg = ig[5]/np.pi*180
 
         vals = (ig[0], x0, y0, sigma_x, sigma_y, theta_deg, ig[6], ig[7], ig[8])
-        print(txt % vals)
+        # print(txt % vals)
         initial_guessSurf = twoD_GaussianWithTilt((x, y), *initial_guess).reshape(shape)
         popt, pcov = opt.curve_fit(twoD_GaussianWithTilt, (x, y), data.ravel(), p0=initial_guess)
         data_fitted = twoD_GaussianWithTilt((x, y), *popt).reshape(shape)
@@ -332,42 +315,68 @@ class fdmsImage():
         roc_y = self._roc(popt[4]*1E6*self.scale, self.popt[0])
         self.radiiOfCurvature = (roc_x, roc_y)
         print('calculated radii of curvature: %.3f and %.3f µm' % self.radiiOfCurvature)
-            
+
+    def fitSine(self, roi):
+        '''roi in (X, Y, W, H)
+        returns amplitude and phase'''
+        
+        data = self.averagedImages[:,roi[1]:roi[1]+roi[3],roi[0]:roi[0]+roi[2]]
+        dataMean = np.mean(np.mean(data, axis=2), axis=1)
+        
+        # initial guess
+        amplitude = (np.max(dataMean)-np.min(dataMean))/2
+        phase = np.mean(self.wrappedPhase[roi[1]:roi[1]+roi[3],roi[0]:roi[0]+roi[2]])
+        period = 4
+        
+        x = np.array(range(self.numStepAnalysis))
+        
+    def _sin(self, x, amplitude, phase, period):
+        '''returns sine for given x, amplitude and phase. x and phase in radians'''
+        val = amplitude * np.sin(x-phase)
+        return val
+        
     def _roc(self, sigma, depth):
         D = 2*np.sqrt(2) * sigma
         radius_curvature = D**2 / (8*depth)
         #with D = full width at height of 1/e
         return radius_curvature
-        
-        '''
-        source: Wyant_Phase-Shifting-Interferometry.pdf
-        
-        phase for four phase steps:
-        phase_4 = atan((-img[1] + img[3]) / (img[0] - img[2]))
-        contrast_4 = sqrt(2)*(((img[0] - img[2])**2) + (img[1] - img[3])**2) / (img[0] + img[1] + img[2] + img[3])
-        phase for five phase steps:
-        phase_5 = atan(7*(img[1] - img[3]) / (-4*img[0] + img[1] + 6*img[2] + img[3] - 4*img[4])
-        contrast_5 = sqrt(49*(img[1] - imgimg[3])**2 + (-4*img[0] + img[1] + 6*img[2] + img[3] -4*img[4])**2) / (2*img[0] + 3*img[1] + 4*img[2] + 3*img[3] + 2*img[4])
-        phase for five phase steps:
-        phase_5 = atan(7*(img[1] - img[3]) / (-4*img[0] + img[1] + 6*img[2] + img[3] - 4*img[4])
-        contrast_5 = sqrt(49*(img[1] - img[3])**2 + (-4*img[0] + img[1] + 6*img[2] + img[3] -4*img[4])**2) / (2*img[0] + 3*img[1] + 4*img[2] + 3*img[3] + 2*img[4])
-        Schwider-Hariharan for five steps:
-        phase_5_SH = atan(-(2*(img[1] - img[2])) / (img[0] - 2*img]2] + img[4]))
-        contrast_5_SH = 2*sqrt(4*(img[1] - img[3])**2 + (img[0] -2*img[2] + img[4])**2) / (img[0] + 2*(img[1] + img[2] + img[3]) + img[4])
-        phase for six phase steps:
-        phase_6 = atan((-3*img[1] + 4*img[3] -img[5]) / (img[0] -4*img[2] + 3*img[4]))
-        phase for seven phase steps:
-        phase_7 = atan((4*(img[1] - 2*img[3] + img[5])) / (-img[0] + 7*img[2] - 7*img[4] + img[6]))
-        '''
-
-        
-        
+    
 if __name__ == '__main__':
-    data = 'C:\\eschenm\\03_projects\\31_Qutech\\FDMS\\data\\20170620\\20170620T101715_interferograms.hdf5'
-    image = fdmsImage(data)
-    image.analyzeSurface()
-    image.plotContrast()
+    if 1:
+        filename = 'C:\\eschenm\\03_projects\\31_Qutech\\FDMS\\data\\20170623\\20170623T145259_interferograms.hdf5'
+        roi = (800, 310, 210, 380)
+        useNrOfSteps = 7
+    elif 0:
+        filename  = 'C:\\eschenm\\03_projects\\31_Qutech\\FDMS\\data\\20170620\\20170620T101715_interferograms.hdf5'
+        useNrOfSteps = 5
+    image = fdmsImage(filename)
+    image.analyzeSurface(useNrOfSteps=useNrOfSteps, roi=roi)
+    image.plotInterferograms()
+    image.plotHeight()
+    image.fitGauss()
     
     # Hint from Pep for interrupting and starting ipython console during execution:
-    #from IPython import embed
-    #embed()
+    if 0:
+        from IPython import embed
+        embed()
+
+    '''
+    Phase determination source: Wyant_Phase-Shifting-Interferometry.pdf
+    
+    phase for four phase steps:
+    phase_4 = atan((-img[1] + img[3]) / (img[0] - img[2]))
+    contrast_4 = sqrt(2)*(((img[0] - img[2])**2) + (img[1] - img[3])**2) / (img[0] + img[1] + img[2] + img[3])
+    phase for five phase steps:
+    phase_5 = atan(7*(img[1] - img[3]) / (-4*img[0] + img[1] + 6*img[2] + img[3] - 4*img[4])
+    contrast_5 = sqrt(49*(img[1] - imgimg[3])**2 + (-4*img[0] + img[1] + 6*img[2] + img[3] -4*img[4])**2) / (2*img[0] + 3*img[1] + 4*img[2] + 3*img[3] + 2*img[4])
+    phase for five phase steps:
+    phase_5 = atan(7*(img[1] - img[3]) / (-4*img[0] + img[1] + 6*img[2] + img[3] - 4*img[4])
+    contrast_5 = sqrt(49*(img[1] - img[3])**2 + (-4*img[0] + img[1] + 6*img[2] + img[3] -4*img[4])**2) / (2*img[0] + 3*img[1] + 4*img[2] + 3*img[3] + 2*img[4])
+    Schwider-Hariharan for five steps:
+    phase_5_SH = atan(-(2*(img[1] - img[2])) / (img[0] - 2*img]2] + img[4]))
+    contrast_5_SH = 2*sqrt(4*(img[1] - img[3])**2 + (img[0] -2*img[2] + img[4])**2) / (img[0] + 2*(img[1] + img[2] + img[3]) + img[4])
+    phase for six phase steps:
+    phase_6 = atan((-3*img[1] + 4*img[3] -img[5]) / (img[0] -4*img[2] + 3*img[4]))
+    phase for seven phase steps:
+    phase_7 = atan((4*(img[1] - 2*img[3] + img[5])) / (-img[0] + 7*img[2] - 7*img[4] + img[6]))
+    '''
