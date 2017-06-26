@@ -191,6 +191,7 @@ class fdmsImage():
         txt = '%s\n%s\nusing %d images' % (str(filename), roitxt, self.numStepAnalysis)
 
         ax.text(0.05,0.5, txt, fontsize=11)
+        plt.show()
         return plt.gcf()
 
     def _plotData(self, data, title='', interpolation="none"):
@@ -202,10 +203,6 @@ class fdmsImage():
             title = str(filename)
         plot = plt.figure()
         shape = np.shape(data)
-        if 0:
-            print('\n\n\n\n******* entering embedded iPython session *******\n\n\n')
-            from IPython import embed
-            embed()
 
         extentX = self.scale*1e6 * np.array((0., shape[1]))
         extentX -= np.mean(extentX)
@@ -219,6 +216,7 @@ class fdmsImage():
         plt.ylabel('position (µm)')
         plt.colorbar()
         plt.title(title)
+        plt.show()
         return plot
         
     def plotContrast(self):
@@ -233,7 +231,7 @@ class fdmsImage():
         return self._plotData(self.unwrapped_phase, title='unwrapped phase (rad)')
     
     def plotHeight(self):
-        return self._plotData(self.height, title='height (µm)')
+        return self._plotData(self.height-np.max(self.height), title='height (µm)')
 
     def fitGauss(self, data = []):
         if not data:
@@ -316,23 +314,46 @@ class fdmsImage():
         self.radiiOfCurvature = (roc_x, roc_y)
         print('calculated radii of curvature: %.3f and %.3f µm' % self.radiiOfCurvature)
 
-    def fitSine(self, roi):
+    def fitCosine(self, roi, plotfit=False):
         '''roi in (X, Y, W, H)
         returns amplitude and phase'''
         
         data = self.averagedImages[:,roi[1]:roi[1]+roi[3],roi[0]:roi[0]+roi[2]]
-        dataMean = np.mean(np.mean(data, axis=2), axis=1)
-        
+        x = np.array(range(0,self.numStepAnalysis))*np.pi/2
+        y = np.mean(np.mean(data, axis=2), axis=1)
+        # val = amplitude * np.cos(x/period-phase) + offset
+
         # initial guess
-        amplitude = (np.max(dataMean)-np.min(dataMean))/2
-        phase = np.mean(self.wrappedPhase[roi[1]:roi[1]+roi[3],roi[0]:roi[0]+roi[2]])
-        period = 4
-        
-        x = np.array(range(self.numStepAnalysis))
-        
-    def _sin(self, x, amplitude, phase, period):
-        '''returns sine for given x, amplitude and phase. x and phase in radians'''
-        val = amplitude * np.sin(x-phase)
+        amplitude= (np.max(y)-np.min(y))/2
+        offset = np.max(y)-amplitude
+        # we already have a good estimate of the phase in self.unwrapped_phase
+        phaseData = self.unwrapped_phase[roi[1]:roi[1]+roi[3],roi[0]:roi[0]+roi[2]]
+        phase = np.mean(phaseData)
+        period = 1
+        initial_guess = (amplitude, phase, offset,  period)
+        popt, pcov = opt.curve_fit(self._cos, x, y,  p0=initial_guess)
+        txt = 'amplitude: %.3f phase: %.3f° offset: %.3f period: %.3f' % (popt[0],  popt[1]*180/np.pi,  popt[2],  popt[3])
+        print(txt)
+        #print('phase from map: %.3f deg' % (phase*180/np.pi))
+        if plotfit:
+            fig = plt.figure()
+            plt.hold(True)
+            plt.plot(x*180/np.pi ,y ,'r+-')
+            x_f = np.linspace(np.min(x), np.max(x), 200)
+            plt.plot(x_f*180/np.pi, image._cos(x_f,*popt),'g-')
+            plt.legend(('data', 'fit'))
+            plt.xlabel('phase (deg)')
+            plt.ylabel('signal (counts)')
+            txt = 'amplitude: %.3f phase: %.3f° offset: %.3f period: %.3f * 2PI' % (popt[0],  popt[1]*180/np.pi,  popt[2],  popt[3])
+            ax=plt.gca()
+            ax.text(0.05,0.85, txt, fontsize=11)
+            plt.show()
+            plt.grid(True)
+        return popt
+
+    def _cos(self, x, amplitude, phase, offset,  period):
+        '''returns cosine for given x, amplitude, phase, offset and period. x and phase in radians'''
+        val = amplitude * np.cos(x/period-phase) + offset
         return val
         
     def _roc(self, sigma, depth):
@@ -343,17 +364,34 @@ class fdmsImage():
     
 if __name__ == '__main__':
     if 1:
+        filename = 'C:\\eschenm\\03_projects\\31_Qutech\\FDMS\\data\\20170626\\20170626T091302_interferograms.hdf5'
+        roi = (250, 250, 600, 600)
+        useNrOfSteps = 7
+        cosRoi = (200, 200, 10, 10)
+    if 0:
+        # filename = '/home/martin/code/20170623T145259_interferograms.hdf5'
         filename = 'C:\\eschenm\\03_projects\\31_Qutech\\FDMS\\data\\20170623\\20170623T145259_interferograms.hdf5'
         roi = (800, 310, 210, 380)
+        cosRoi = (546,  949,  10,  5)
         useNrOfSteps = 7
     elif 0:
         filename  = 'C:\\eschenm\\03_projects\\31_Qutech\\FDMS\\data\\20170620\\20170620T101715_interferograms.hdf5'
+        cosRoi = (546,  949,  10,  5)
         useNrOfSteps = 5
     image = fdmsImage(filename)
     image.analyzeSurface(useNrOfSteps=useNrOfSteps, roi=roi)
     image.plotInterferograms()
+    
     image.plotHeight()
-    image.fitGauss()
+    #image.fitGauss()
+    nrSteps = 10
+    periods = np.zeros((nrSteps, nrSteps))
+    for ii in range(nrSteps):
+        for jj in range(nrSteps):
+            roiC = (cosRoi[0]+ii*20, cosRoi[1]+jj*20, cosRoi[2], cosRoi[3])
+            popt = image.fitCosine(roiC)
+            periods[ii, jj] = popt[3]
+    print('mean period: %.3f' % np.mean(periods))        
     
     # Hint from Pep for interrupting and starting ipython console during execution:
     if 0:
