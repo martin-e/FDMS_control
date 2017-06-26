@@ -191,6 +191,7 @@ class fdmsImage():
         txt = '%s\n%s\nusing %d images' % (str(filename), roitxt, self.numStepAnalysis)
 
         ax.text(0.05,0.5, txt, fontsize=11)
+        plt.show()
         return plt.gcf()
 
     def _plotData(self, data, title='', interpolation="none"):
@@ -202,10 +203,6 @@ class fdmsImage():
             title = str(filename)
         plot = plt.figure()
         shape = np.shape(data)
-        if 0:
-            print('\n\n\n\n******* entering embedded iPython session *******\n\n\n')
-            from IPython import embed
-            embed()
 
         extentX = self.scale*1e6 * np.array((0., shape[1]))
         extentX -= np.mean(extentX)
@@ -219,6 +216,7 @@ class fdmsImage():
         plt.ylabel('position (µm)')
         plt.colorbar()
         plt.title(title)
+        plt.show()
         return plot
         
     def plotContrast(self):
@@ -321,18 +319,24 @@ class fdmsImage():
         returns amplitude and phase'''
         
         data = self.averagedImages[:,roi[1]:roi[1]+roi[3],roi[0]:roi[0]+roi[2]]
-        dataMean = np.mean(np.mean(data, axis=2), axis=1)
-        
+        x = np.array(range(0,self.numStepAnalysis))*np.pi/2
+        y = np.mean(np.mean(data, axis=2), axis=1)
+        # val = amplitude * np.sin(x/period-phase) + offset
+
         # initial guess
-        amplitude = (np.max(dataMean)-np.min(dataMean))/2
+        amplitude= (np.max(y)-np.min(y))/2
+        offset = np.max(y)-amplitude
+        # we already have a good estimate of the phase in self.wrappedPhase
         phase = np.mean(self.wrappedPhase[roi[1]:roi[1]+roi[3],roi[0]:roi[0]+roi[2]])
         period = 4
+        initial_guess = (amplitude, phase, offset,  period)
+        popt, pcov = opt.curve_fit(self._sin, x, y,  p0=initial_guess)
+        print('amplitude: %.3f phase: %.3f offset: %.3f period: %.3f' % (popt[0],  popt[1],  popt[2],  popt[3]))        
+        print('phase from map: %.3f' % phase)
         
-        x = np.array(range(self.numStepAnalysis))
-        
-    def _sin(self, x, amplitude, phase, period):
-        '''returns sine for given x, amplitude and phase. x and phase in radians'''
-        val = amplitude * np.sin(x-phase)
+    def _sin(self, x, amplitude, phase, offset,  period):
+        '''returns sine for given x, amplitude, phase, offset and period. x and phase in radians'''
+        val = amplitude * np.sin(x/period-phase) + offset
         return val
         
     def _roc(self, sigma, depth):
@@ -343,7 +347,8 @@ class fdmsImage():
     
 if __name__ == '__main__':
     if 1:
-        filename = 'C:\\eschenm\\03_projects\\31_Qutech\\FDMS\\data\\20170623\\20170623T145259_interferograms.hdf5'
+        filename = '/home/martin/code/20170623T145259_interferograms.hdf5'
+        # filename = 'C:\\eschenm\\03_projects\\31_Qutech\\FDMS\\data\\20170623\\20170623T145259_interferograms.hdf5'
         roi = (800, 310, 210, 380)
         useNrOfSteps = 7
     elif 0:
@@ -352,8 +357,10 @@ if __name__ == '__main__':
     image = fdmsImage(filename)
     image.analyzeSurface(useNrOfSteps=useNrOfSteps, roi=roi)
     image.plotInterferograms()
+    
     image.plotHeight()
-    image.fitGauss()
+    #image.fitGauss()
+    image.fitSine((546,  949,  10,  5))
     
     # Hint from Pep for interrupting and starting ipython console during execution:
     if 0:
