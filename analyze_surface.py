@@ -33,8 +33,8 @@ class fdmsImage():
         if os.path.isfile(filename):
             filepath = os.path.realpath(filename)
         else:
-            logging.error('file %s not found for analysis' % filepath)
-            raise Exception('file %s not found for analysis' % filepath)
+            logging.error('could not find file %s' % filename)
+            raise Exception('could not find file %s' % filename)
         logging.info('reading file %s'  % filepath)
         
         try:
@@ -172,6 +172,7 @@ class fdmsImage():
             plotdata = self.averagedImages[ii,...]
             ax.imshow(plotdata, cmap='gray', interpolation=interpolation)
             if hasattr(self, 'roi'):
+                roi = self.roi
                 rect = patches.Rectangle((roi[1],roi[0]),roi[3],roi[2], \
                                          linewidth=1,edgecolor='r',facecolor='none')
                 ax.add_patch(rect)
@@ -363,36 +364,43 @@ class fdmsImage():
         return radius_curvature
     
 if __name__ == '__main__':
+    datadir = 'D:\\FiberDimpleManufacturing\\data\\'
+    # datadir = 'C:\\eschenm\\03_projects\\31_Qutech\\FDMS\\data\\'
     if 1:
-        filename = 'C:\\eschenm\\03_projects\\31_Qutech\\FDMS\\data\\20170626\\20170626T091302_interferograms.hdf5'
+        filename = datadir + '20170626\\20170626T153130_interferograms.hdf5'
         roi = (250, 250, 600, 600)
         useNrOfSteps = 7
         cosRoi = (200, 200, 10, 10)
     if 0:
-        # filename = '/home/martin/code/20170623T145259_interferograms.hdf5'
-        filename = 'C:\\eschenm\\03_projects\\31_Qutech\\FDMS\\data\\20170623\\20170623T145259_interferograms.hdf5'
+        filename = datadir + '20170626\\20170626T091302_interferograms.hdf5'
+        roi = (250, 250, 600, 600)
+        useNrOfSteps = 7
+        cosRoi = (200, 200, 10, 10)
+    if 0:
+        filename = datadir + '20170623\\20170623T145259_interferograms.hdf5'
         roi = (800, 310, 210, 380)
         cosRoi = (546,  949,  10,  5)
         useNrOfSteps = 7
     elif 0:
-        filename  = 'C:\\eschenm\\03_projects\\31_Qutech\\FDMS\\data\\20170620\\20170620T101715_interferograms.hdf5'
+        filename  = datadir + '20170620\\20170620T101715_interferograms.hdf5'
         cosRoi = (546,  949,  10,  5)
         useNrOfSteps = 5
     image = fdmsImage(filename)
     image.analyzeSurface(useNrOfSteps=useNrOfSteps, roi=roi)
     image.plotInterferograms()
-    
     image.plotHeight()
     #image.fitGauss()
-    nrSteps = 10
-    periods = np.zeros((nrSteps, nrSteps))
-    for ii in range(nrSteps):
-        for jj in range(nrSteps):
-            roiC = (cosRoi[0]+ii*20, cosRoi[1]+jj*20, cosRoi[2], cosRoi[3])
-            popt = image.fitCosine(roiC)
-            periods[ii, jj] = popt[3]
-    print('mean period: %.3f' % np.mean(periods))        
     
+    if 0:
+        nrSteps = 10
+        periods = np.zeros((nrSteps, nrSteps))
+        for ii in range(nrSteps):
+            for jj in range(nrSteps):
+                roiC = (cosRoi[0]+ii*20, cosRoi[1]+jj*20, cosRoi[2], cosRoi[3])
+                popt = image.fitCosine(roiC)
+                periods[ii, jj] = popt[3]
+        print('mean period: %.3f' % np.mean(periods))
+        
     # Hint from Pep for interrupting and starting ipython console during execution:
     if 0:
         from IPython import embed

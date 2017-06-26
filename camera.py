@@ -110,7 +110,10 @@ class Camera():
                                                      camera_ini['roi'][3], \
                                                      pixelFormat)
         (fm7PacketInfo, isValid) = self._cam.validateFormat7Settings(self.fm7Settings)
-        if not isValid:
+        if isValid:
+            for line in str(self._formatStorageClass(fm7PacketInfo)).splitlines():
+                logging.info(line)
+        else:
             print('invalid image settings, make sure that image offsetX and \
             offsetY and width and height are the correct \
             multiples!! (%d, %d, %d and %d respectively)' %\

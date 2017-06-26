@@ -5,17 +5,23 @@ Created on Sat Jun 10 22:45:46 2017
 @author: eschenm
 """
 from configparser import ConfigParser
-import logging
+
+def getDatapath(file):    
+    parser = ConfigParser()
+    parser.read(file)
+    return parser.get('fdms', 'measure_datapath')
 
 def parseInifile(file):
     parser = ConfigParser()
     parser.read(file)
-    logging.debug('read ini settings')
 
     fdms = dict()
-    bools = ('MEASURE_SURFACE', 'SHOOT_DIMPLE')
+    bools = ('MEASURE_SURFACE', 'SHOOT_DIMPLE', )
+    strings = ('measure_datapath', )
     for option in bools:
         fdms[option] = parser.getboolean('fdms', option)
+    for option in strings:
+        fdms[option] = parser.get('fdms', option)
     
     # this section starts all connections
     # piezo pid control

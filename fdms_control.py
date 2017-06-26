@@ -10,7 +10,7 @@ fire a controlled laser pulse onto the fiber.
 
 import time, sys, os, logging
 import logger
-from iniparser import parseInifile
+import iniparser
 import analyze_surface
 
 if sys.version_info > (3,):
@@ -22,20 +22,47 @@ else:
 
 INIFILE = 'fdms.ini'
 LOGLEVEL = logging.DEBUG
-
-datapath = 'D:\FiberDimpleManufacturing\data'  #this is the dir in which daily dirs are created
-today = time.strftime('%Y%m%d')
-datapath = os.path.join(datapath, today)
-if not os.path.exists(datapath):
-    os.mkdir(datapath)
-    logging.debug('created new directory %s' % datapath)
-
-logger.startLogger(logPath=datapath, level = LOGLEVEL)
+datapath = iniparser.getDatapath(INIFILE)
 
 (fdms_ini, piezo_ini, camera_ini, phase_stepping_ini, \
  powermeter_ini, awg_ini, dimple_shooting_ini) = \
-  parseInifile(INIFILE)
+  iniparser.parseInifile(INIFILE)
 
+datapath = fdms_ini['measure_datapath']  #this is the dir in which daily dirs are created
+today = time.strftime('%Y%m%d')
+datapath = os.path.join(datapath, today)
+new_dir_logmessage = ''
+if not os.path.exists(datapath):
+    os.mkdir(datapath)
+    new_dir_logmessage = 'created new directory %s' % datapath
+logger.startLogger(logPath=datapath, level = LOGLEVEL)
+if new_dir_logmessage:
+    logging.debug(new_dir_logmessage)
+
+logging.info('PIEZO ini settings:')
+for (k, v) in piezo_ini.items():
+    logging.info('\t%s:  %s' %(k, str(v)))
+
+logging.info('CAMERA ini settings:')
+for (k, v) in camera_ini.items():
+    logging.info('\t%s:  %s' %(k, str(v)))
+
+logging.info('PHASE STEPPING ini settings:')
+for (k, v) in phase_stepping_ini.items():
+    logging.info('\t%s:  %s' %(k, str(v)))
+
+logging.info('POWERMETER ini settings:')
+for (k, v) in powermeter_ini.items():
+    logging.info('\t%s:  %s' %(k, str(v)))
+
+logging.info('AWG ini settings:')
+for (k, v) in awg_ini.items():
+    logging.info('\t%s:  %s' %(k, str(v)))
+    
+logging.info('DIMPLE SHOOTING ini settings:')
+for (k, v) in dimple_shooting_ini.items():
+    logging.info('\t%s:  %s' %(k, str(v)))
+    
 MEASURE_SURFACE = fdms_ini['MEASURE_SURFACE']
 SHOOT_DIMPLE = fdms_ini['SHOOT_DIMPLE']
 
@@ -95,7 +122,6 @@ def stopFdms():
 
         try:
             global u3
-            u3.disconnect()
             del u3
             logging.debug('labjack disconnected')
         except:
