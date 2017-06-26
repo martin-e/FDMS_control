@@ -7,6 +7,7 @@ Created on Fri Jun  9 13:09:11 2017
 
 import logging, sys, os, time
 
+# define error class compatible with python 2.7 and 3.X
 if sys.version_info > (3,):
     class LoggerError(Exception):
         pass

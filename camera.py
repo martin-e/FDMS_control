@@ -41,7 +41,7 @@ class Camera():
                 self._cameraInfo.resolution = [ int(a) for a in self._cameraInfo.sensorResolution.decode().split('x') ]
             else:
                 self._cameraInfo.resolution = [ int(a) for a in self._cameraInfo.sensorResolution.split('x') ]
-        for line in str(self._formatStorageClass(self._cameraInfo)):
+        for line in str(self._formatStorageClass(self._cameraInfo)).splitlines():
             logging.info(line)
         
         # preparing image statistics calculation
@@ -110,7 +110,10 @@ class Camera():
                                                      camera_ini['roi'][3], \
                                                      pixelFormat)
         (fm7PacketInfo, isValid) = self._cam.validateFormat7Settings(self.fm7Settings)
-        if not isValid:
+        if isValid:
+            for line in str(self._formatStorageClass(fm7PacketInfo)).splitlines():
+                logging.info(line)
+        else:
             print('invalid image settings, make sure that image offsetX and \
             offsetY and width and height are the correct \
             multiples!! (%d, %d, %d and %d respectively)' %\

@@ -4,6 +4,7 @@
 [fdms]
 MEASURE_SURFACE = True
 SHOOT_DIMPLE = False
+measure_datapath = D:\FiberDimpleManufacturing\data
 
 # options for controlling the reference arm of the interferometer
 [piezo]
@@ -46,15 +47,15 @@ wavelength = 10600
 # number of averaged readings taking about 3 ms each
 averages = 50
 
-
 [dimple_shooting]
 # number of laser pulses to be shot
 nr_pulses = 1
 # time in s between the shots
-interval = 1E-6
+interval = 1E-5
 # pulse length in s for default dimple
-length = 1E-6
+length = 5E-6
 # default height of the pulse in V
 default_height = 7.5
 # default power in W for which pulse length applies
 default_power = 25.0
+
