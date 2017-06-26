@@ -41,7 +41,7 @@ class Camera():
                 self._cameraInfo.resolution = [ int(a) for a in self._cameraInfo.sensorResolution.decode().split('x') ]
             else:
                 self._cameraInfo.resolution = [ int(a) for a in self._cameraInfo.sensorResolution.split('x') ]
-        for line in str(self._formatStorageClass(self._cameraInfo)):
+        for line in str(self._formatStorageClass(self._cameraInfo)).splitlines():
             logging.info(line)
         
         # preparing image statistics calculation
