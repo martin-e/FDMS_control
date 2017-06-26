@@ -20,13 +20,15 @@ class fdmsImage():
         Opens and reads hdf5 file stored by FDMS control software
 
         image = fdmsImage(pathToHdf5File)
-        image.analyzeSurface(roi=(410,390, 400, 400))
+        image.analyzeSurface(roi=(410,390, 400, 400), \
+            useNrOfSteps=5)
         
         image.plotInterferograms()
         image.plotContrast()
         image.plotPhase()
         image.plotUnwrappedPhase()
         image.plotHeight()
+        image.fitGauss()
         '''
         
         logging.debug('start analysis of file %s' % filename)
@@ -233,7 +235,7 @@ class fdmsImage():
     def plotHeight(self):
         return self._plotData(self.height, title='height (µm)')
 
-    def fitGauss(self, data = []):
+    def fitGauss(self, data = None):
         if not data:
             data = self.height
         shape = np.shape(data)
