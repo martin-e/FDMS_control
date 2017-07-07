@@ -4,7 +4,6 @@
 [fdms]
 MEASURE_SURFACE = True
 SHOOT_DIMPLE = False
-measure_datapath = D:\FiberDimpleManufacturing\data
 
 # options for controlling the reference arm of the interferometer
 [piezo]
@@ -39,8 +38,11 @@ stepSize = 0.095
 wavelength = 650E-9
 
 [awg]
-channel = 1
-load = 600
+# channel 1 MUST be connected to the digital input of the RF driver
+# channel 2 MUST be connected to analog input #1 of the RF driver
+# INCORRECT CONNECTIONS LIKELY RESULT IN PERMANENT DAMAGE TO THE SETUP!!!
+load1 = 4700
+load2 = HiZ
 
 [powermeter]
 wavelength = 10600
@@ -58,4 +60,3 @@ length = 5E-6
 default_height = 7.5
 # default power in W for which pulse length applies
 default_power = 25.0
-

@@ -4,6 +4,7 @@ Created on Sat Jun 10 22:45:46 2017
 
 @author: eschenm
 """
+import logging
 from configparser import ConfigParser
 
 def getDatapath(file):    
@@ -42,14 +43,13 @@ def parseInifile(file):
     camera['roi'] = [int(val) for val in parser.get('camera', 'roi').split(',')]
 
     # reading awg ini settings
+    # channel 1 MUST be connected to the digital input of the RF driver
+    # channel 2 MUST be connected to analog input #1 of the RF driver
+    # INCORRECT CONNECTIONS LIKELY RESULT IN PERMANENT DAMAGE TO THE SETUP!!!
     awg = dict()
-    ints = ('channel', )
-    strings = ('load', )
-    for option in ints:
-        awg[option] = int(parser.get('awg', option))
+    strings = ('load1', 'load2', )
     for option in strings:
         awg[option] = parser.get('awg', option)
-    
     
     # reading powermeter ini settings
     powermeter = dict()
@@ -75,4 +75,12 @@ def parseInifile(file):
     for option in ints:
         dimple_shooting[option] = int(parser.get('dimple_shooting', option))
     
-    return fdms, piezo, camera, phase_stepping, powermeter, awg, dimple_shooting
+    inis = ('fdms', 'piezo', 'camera', 'phase_stepping', 'powermeter', 'awg', \
+            'dimple_shooting')
+    for ini in inis:
+        logging.info('%s ini settings:' % ini.upper())
+        for (k, v) in locals()[ini].items():
+            logging.info('\t%s:  %s' %(k, str(v)))
+        
+    return (fdms, piezo, camera, phase_stepping, powermeter, awg, \
+            dimple_shooting)

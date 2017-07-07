@@ -100,9 +100,9 @@ if SHOOT_DIMPLE:
     
     shoot = dimple_shooting.DimpleShooting(powermeter_ini, awg_ini, dimple_shooting_ini, powermeter, awg)
     
-    msg = 'all hardware now connected'
-    logging.info(msg)
-    print(msg)
+msg = 'all hardware now connected'
+logging.info(msg)
+print(msg)
 
 # create dimple shooting class instance :
 #    dimple = dimple_shooting.ShootDimple(dimple_shooting_ini, awg, powermeter)
