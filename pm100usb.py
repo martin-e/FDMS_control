@@ -39,7 +39,7 @@ class Pm100usb():
                 
     def _connectToDevice(self):
         device = self._findPowermeter()
-        if device == []:
+        if len(device) == 0:
             msg = 'powermeter not found'
             logging.error(msg)
             raise PowermeterError(msg)
