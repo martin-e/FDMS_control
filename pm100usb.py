@@ -6,7 +6,7 @@ connected will be interfaced.'''
 
 import pyvisa
 import sys
-import struct
+import time
 import logging
 
 if sys.version_info > (3,):
@@ -118,4 +118,11 @@ class Pm100usb():
             msg = 'powermeter is not configured, run prepareSettings() first'
             logging.error(msg)
             raise PowermeterError(msg)
-        
+    
+    def getTemperature(self):
+        self.pm100usb_dev.write('CONF:TEMP')
+        time.sleep(0.1)
+        answer = self.pm100usb_dev.ask('READ?')
+        temperature = float(answer.strip())
+        self.pm100usb_dev.write('CONF:POW')  #leave prepared for power measurement
+        return temperature
