@@ -26,6 +26,7 @@ framerate = 20
 integrationTime = 40
 # bits per pixel, 8 or 16 (16 only supported in format 7 mode 7)
 nrBits = 16
+sharpness = 0
 
 [phase_stepping]
 # number of interferograms that will be recorded

@@ -35,7 +35,7 @@ def parseInifile(file):
     # reading camera ini settings
     camera = dict()
     floats = ('framerate', 'integrationTime', )
-    ints = ('nrBits', 'fm7Mode', )
+    ints = ('nrBits', 'fm7Mode', 'sharpness', )
     for option in floats:
         camera[option] = float(parser.get('camera', option))
     for option in ints:

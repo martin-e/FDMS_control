@@ -8,8 +8,11 @@ fire a controlled laser pulse onto the fiber.
 (Copyright) M. Eschen - 2017
 """
 
-import time, sys, os, logging
-import logger
+import time
+import sys
+import os
+import logging
+import fdms_utils as utils
 import iniparser
 import analyze_surface
 
@@ -23,45 +26,40 @@ else:
 INIFILE = 'fdms.ini'
 LOGLEVEL = logging.DEBUG
 datapath = iniparser.getDatapath(INIFILE)
+dailydir = utils.createDailydir(datapath)
+print('storing logfile and measurement data in directory: %s' % dailydir)
 
+utils.startLogger(logPath=dailydir, level=LOGLEVEL)
 (fdms_ini, piezo_ini, camera_ini, phase_stepping_ini, \
  powermeter_ini, awg_ini, dimple_shooting_ini) = \
   iniparser.parseInifile(INIFILE)
 
-datapath = fdms_ini['measure_datapath']  #this is the dir in which daily dirs are created
-today = time.strftime('%Y%m%d')
-datapath = os.path.join(datapath, today)
-new_dir_logmessage = ''
-if not os.path.exists(datapath):
-    os.mkdir(datapath)
-    new_dir_logmessage = 'created new directory %s' % datapath
-logger.startLogger(logPath=datapath, level = LOGLEVEL)
-if new_dir_logmessage:
-    logging.debug(new_dir_logmessage)
 
-logging.info('PIEZO ini settings:')
+log = logging.getLogger('fdms_control')
+
+log.info('PIEZO ini settings:')
 for (k, v) in piezo_ini.items():
-    logging.info('\t%s:  %s' %(k, str(v)))
+    log.info('\t%s:  %s' %(k, str(v)))
 
-logging.info('CAMERA ini settings:')
+log.info('CAMERA ini settings:')
 for (k, v) in camera_ini.items():
-    logging.info('\t%s:  %s' %(k, str(v)))
+    log.info('\t%s:  %s' %(k, str(v)))
 
-logging.info('PHASE STEPPING ini settings:')
+log.info('PHASE STEPPING ini settings:')
 for (k, v) in phase_stepping_ini.items():
-    logging.info('\t%s:  %s' %(k, str(v)))
+    log.info('\t%s:  %s' %(k, str(v)))
 
-logging.info('POWERMETER ini settings:')
+log.info('POWERMETER ini settings:')
 for (k, v) in powermeter_ini.items():
-    logging.info('\t%s:  %s' %(k, str(v)))
+    log.info('\t%s:  %s' %(k, str(v)))
 
-logging.info('AWG ini settings:')
+log.info('AWG ini settings:')
 for (k, v) in awg_ini.items():
-    logging.info('\t%s:  %s' %(k, str(v)))
+    log.info('\t%s:  %s' %(k, str(v)))
     
-logging.info('DIMPLE SHOOTING ini settings:')
+log.info('DIMPLE SHOOTING ini settings:')
 for (k, v) in dimple_shooting_ini.items():
-    logging.info('\t%s:  %s' %(k, str(v)))
+    log.info('\t%s:  %s' %(k, str(v)))
     
 MEASURE_SURFACE = fdms_ini['MEASURE_SURFACE']
 SHOOT_DIMPLE = fdms_ini['SHOOT_DIMPLE']
@@ -69,7 +67,7 @@ SHOOT_DIMPLE = fdms_ini['SHOOT_DIMPLE']
 if MEASURE_SURFACE:
     import camera, pidControl, measure_surface
 
-    logging.info('setting up connections for measuring surface')
+    log.info('setting up connections for measuring surface')
     u3 = pidControl.connectU3()
     parameters = {'pid': piezo_ini['pid'],
                   'setpoint': piezo_ini['offset'], 
@@ -78,30 +76,30 @@ if MEASURE_SURFACE:
                   'pausetime': 0.005,}
     ctrl = pidControl.PidController(u3, **parameters)
     ctrl.start()
-    logging.info('started PID loop')
+    log.info('started PID loop')
     # wait for pid loop to stabilize
     start = time.time()
     while abs(ctrl.getError()) > piezo_ini['maxError']:
         if (time.time() - start) > 5:
-            logging.error('piezo not within errormargin after initialisation')
+            log.error('piezo not within errormargin after initialisation')
             raise FdmsError('piezo not at setpoint after initialisation')
         time.sleep(0.1)
     
     cam = camera.Camera(camera_ini)
     
-    measure = measure_surface.Phase_stepping(piezo_ini, phase_stepping_ini, cam, ctrl, datapath)
+    measure = measure_surface.Phase_stepping(piezo_ini, phase_stepping_ini, cam, ctrl, dailydir)
 
 if SHOOT_DIMPLE:
     import sdg2000x, pm100usb, dimple_shooting
 
-    logging.info('setting up connections for shooting dimples')
+    log.info('setting up connections for shooting dimples')
     awg = sdg2000x.Sdg2000x(awg_ini)
     powermeter = pm100usb.Pm100usb(powermeter_ini)
     
     shoot = dimple_shooting.DimpleShooting(powermeter_ini, awg_ini, dimple_shooting_ini, powermeter, awg)
     
 msg = 'all hardware now connected'
-logging.info(msg)
+log.info(msg)
 print(msg)
 
 # create dimple shooting class instance :
@@ -109,7 +107,7 @@ print(msg)
 
 def stopFdms():
     # closing connections
-    logging.info('shutting down application')
+    log.info('shutting down application')
     if MEASURE_SURFACE:
         try:
             global ctrl
@@ -118,12 +116,12 @@ def stopFdms():
         except:
             pass
         finally:
-            logging.debug('pid loop stopped')
+            log.debug('pid loop stopped')
 
         try:
             global u3
             del u3
-            logging.debug('labjack disconnected')
+            log.debug('labjack disconnected')
         except:
             pass
         finally:
@@ -154,5 +152,5 @@ def stopFdms():
         finally:
             pass
     
-    logging.info('stop log')
+    log.info('stop log')
     logging.shutdown()

@@ -10,9 +10,11 @@ import labjack
 from threading import Thread
 from threading import Lock
 
+log = logging.getLogger('pidControl')
+
 def connectU3():
     u3 = labjack.LabJackU3()
-    logging.debug('connected labjeck U3')
+    log.debug('connected labjeck U3')
     u3.piezo = labjack.Piezo(u3)
     u3.adc = labjack.Adc(u3)
     u3.pulser = labjack.Pulser(u3)
@@ -145,6 +147,7 @@ class PidController(Thread):
     def terminate(self):
         self.lock.acquire()
         try:
+            log.info('stopping PID control loop')
             self._continue = False
         finally:
             self.lock.release()

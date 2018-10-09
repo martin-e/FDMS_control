@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jun 15 09:22:53 2017
@@ -75,8 +76,14 @@ class Camera():
                 time.sleep(0.1)
                 logging.debug('auto setting of %s set to %s' % (item, str(self._cam.getProperty(propType).autoManualMode)))
         
+        propType = PyCapture2.PROPERTY_TYPE.SHARPNESS
+        prop = self._cam.getProperty(propType)
+        prop.absValue = camera_ini['sharpness']
+        self._cam.setProperty(prop)
+        time.sleep(0.1)
+        logging.info('sharpness set to: %d' % self._cam.getProperty(propType).absValue)
+        
         propType = PyCapture2.PROPERTY_TYPE.FRAME_RATE
-        # propInfo = self._cam.getPropertyInfo(propType)
         prop = self._cam.getProperty(propType)
         prop.absValue = camera_ini['framerate']
         self._cam.setProperty(prop)
