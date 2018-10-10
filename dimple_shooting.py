@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Class for creating dimples
-Created on Mon Jun 12 12:08:32 2017
-
 @author: eschenm
 """
 
-import logging, sys
+import logging
+import sys
 
 if sys.version_info > (3,):
     class DimpleShootingError(Exception):
@@ -33,32 +31,35 @@ class DimpleShooting():
         '''
         optional kwargs: (period=5E-6, width=1E-6, height=5V, nr_pulses=1)
         '''
-        period = kwargs.get('period', self.dimple_shooting_ini['pulse'] + self.dimple_shooting_ini['length'])
-        if kwargs.get('period', None):
+        defaultPeriod = (self.dimple_shooting_ini['pulse'] + self.dimple_shooting_ini['length'])
+        period = kwargs.get('period', default=defaultPeriod)
+        if kwargs.get('period') is None:
             msg = 'using non-default value for (pulse train) period: %E.3s' % period
             print(msg)
             logging.debug(msg)
-        
-        width = kwargs.get('width', self.dimple_shooting_ini['width'])
-        if kwargs.get('width', None):
+
+        defaultWidth = self.dimple_shooting_ini['width']
+        width = kwargs.get('width', default=defaultWidth)
+        if kwargs.get('width') is None:
             msg = 'using non-default value for pulse width: %E.3s' % width
             print(msg)
             logging.debug(msg)
 
-            cycles = int(kwargs.get('nr_pulses', self.dimple_shooting_ini['nr_pulses']))
-        if kwargs.get('nr_pulses', None):
+        defaultNrPulses = self.dimple_shooting_ini['nr_pulses']
+        cycles = int(kwargs.get('nr_pulses', default=defaultNrPulses))
+        if kwargs.get('nr_pulses') is None:
             msg = 'using non-default value for number of pulses: %d' % int(nr_pulses)
             print(msg)
             logging.debug(msg)
 
         actualPower = self.powermeter.readPower()
-        height = kwargs.get('height', (currentPower / self.dimple_shooting_ini['default_power'] * self.dimple_shooting_ini['height']))
-        if kwargs.get('height', None):
+        height = kwargs.get('height', default=(currentPower / self.dimple_shooting_ini['default_power'] * self.dimple_shooting_ini['height']))
+        if kwargs.get('height') is None:
             msg = 'using non-default value for number of pulse height: %.4fV' % height
             print(msg)
             logging.debug(msg)
         self.awg.setIntensity(height)
         self.awg.prepareBurst(period, width, cycles)
-
+        
     def shoot(self):
         self.awg.sendBurst()

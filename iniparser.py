@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Jun 10 22:45:46 2017
-
 @author: eschenm
 """
+
 import logging
 from configparser import ConfigParser
 
@@ -13,6 +12,7 @@ def getDatapath(file):
     return parser.get('fdms', 'measure_datapath')
 
 def parseInifile(file):
+    log = logging.getLogger('iniparser')
     parser = ConfigParser()
     parser.read(file)
 
@@ -78,9 +78,9 @@ def parseInifile(file):
     inis = ('fdms', 'piezo', 'camera', 'phase_stepping', 'powermeter', 'awg', \
             'dimple_shooting')
     for ini in inis:
-        logging.info('%s ini settings:' % ini.upper())
+        log.info('%s ini settings:' % ini.upper())
         for (k, v) in locals()[ini].items():
-            logging.info('\t%s:  %s' %(k, str(v)))
+            log.info('\t%s:  %s' %(k, str(v)))
         
     return (fdms, piezo, camera, phase_stepping, powermeter, awg, \
             dimple_shooting)

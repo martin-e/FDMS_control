@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''M. Eschen, 2017
 
 class to control a Siglent SDG2000X series AWG via the
@@ -7,9 +8,16 @@ connected via USB will be interfaced.
 
 Channel 1 MUST be connected to the digital input of the RF driver
 Channel 2 MUST be connected to analog input #1 of the RF driver
-INCORRECT CONNECTIONS LIKELY RESULT IN PERMANENT DAMAGE TO THE SETUP!!!'''
+INCORRECT CONNECTIONS LIKELY RESULT IN PERMANENT DAMAGE TO THE SETUP!!!
 
-import pyvisa, sys, struct, time, logging
+@author: eschenm
+'''
+
+import pyvisa
+import sys
+import struct
+import time
+import logging
 
 if sys.version_info > (3,):
     class AwgError(Exception):
@@ -18,7 +26,8 @@ else:
     class AwgError(StandardError):
         pass
 
-logger = logging.getLogger('SDG2000')
+log = logging.getlogger('SDG2000')
+logging.getLogger('pyvisa').setLevel(logging.WARNING)
 
 class Sdg2000x():
     def __init__(self, awg_ini, resourceName='', ):
@@ -35,7 +44,7 @@ class Sdg2000x():
 
     def __del__(self):
         if self.isConnected:
-            logger.warning('disconnecting AWG withoud closing first')
+            log.warning('disconnecting AWG withoud closing first')
             try:
                 self.close()
             except:
@@ -47,7 +56,7 @@ class Sdg2000x():
             raise AwgError('AWG not found')
         self.awgDev = self.rm.open_resource(device)
         self.isConnected = True
-        logger.info('AWG connected')
+        log.info('AWG connected')
 
     def close(self):
         if self.isConnected:
@@ -56,14 +65,14 @@ class Sdg2000x():
             self.setOutput(1,False)
             self.awgDev.close()
             self.isConnected = False
-            logger.info('AWG disconnected')
+            log.info('AWG disconnected')
         else:
             print('connection to AWG is already closed')
-            logger.debug('attempt to close already disconnected AWG')
+            log.debug('attempt to close already disconnected AWG')
 
     def findAwg(self):
         devices = self.rm.list_resources(self.resourceString)
-        logger.debug('found awg\'s: %s' % str(devices))
+        log.debug('found awg\'s: %s' % str(devices))
         if devices:
             if (len(devices)) > 1:
                 raise AwgError('more than one AWG found!')
@@ -77,7 +86,7 @@ class Sdg2000x():
         self.awginfo.model = model
         self.awginfo.serialNr = serialNr
         self.awginfo.fwVersion = fwVersion
-        logger.debug('AWG id: %s' % idn)
+        log.debug('AWG id: %s' % idn)
 
     def prepareSettings(self):
         self.awgDev.write('*RST')   # reset to factory defaults
@@ -109,20 +118,20 @@ class Sdg2000x():
         elif int(load) > 100000:
             load = 'HIZ'
         else:
-            logger.error('AWG: specified invalid output load')
+            log.error('AWG: specified invalid output load')
             raise AwgError('AWG invalid output load')
         if channel in (1, 2):
                 self.awgDev.write('C%d:OUTP LOAD, %s' % (channel, str(load)))
-                logger.debug('AWG enabled channel %d' % channel)
+                log.debug('AWG enabled channel %d' % channel)
         else:
-            logger.error('AWG: specified invalid output channel')
+            log.error('AWG: specified invalid output channel')
             raise AwgError('invalid channel')
         
 
     def setIntensity(self, intensity):
         if intensity < 0 or intensity > 10:
             msg = 'intensity outside range 0 to 10 Volt!'
-            logger.error(msg)
+            log.error(msg)
             raise AwgError(msg)
         self.awgDev.write('C2:BSWV OFST, %.3fV' % intensity)
 
@@ -143,17 +152,17 @@ class Sdg2000x():
         self.awgDev.write('C1:BTWV TIME, %d' % cycles)
         self.isArmed = True
         self.duration = cycles * period
-        logger.info('AWG armed: period=%.5Es, width=%.5Es, cycles=%d and TTL height=%.4E' % (period, width, cycles, height))
+        log.info('AWG armed: period=%.5Es, width=%.5Es, cycles=%d and TTL height=%.4E' % (period, width, cycles, height))
 
     def sendBurst(self):
         if not self.isArmed:
-            raise awgError('awg is not armed')
+            raise AwgError('awg is not armed')
         self.awgDev.write('C1:BTWV MTRIG')
-        logger.info('triggered AWG')
+        log.info('triggered AWG')
         time.sleep(self.duration)
         self.setOutput(1, False)
         self.isArmed = False
-        logger.info('disarmed AWG')
+        log.info('disarmed AWG')
 
     def setOutput(self, channel, state):
         if type(state) is not bool:
@@ -161,14 +170,14 @@ class Sdg2000x():
         if channel in (1, 2):
             if state:
                 self.awgDev.write('C%d:OUTP ON' % channel)
-                logger.debug('AWG enabled channel %d' % channel)
+                log.debug('AWG enabled channel %d' % channel)
             else:
                 if channel == 1 and self.getOutput(2):
                     msg = 'first turn of channel 2 before turning off channel 1!!!'
-                    logger.error(msg)
+                    log.error(msg)
                     raise AwgError(msg)
                 self.awgDev.write('C%d:OUTP OFF' % channel)
-                logger.debug('AWG disabled channel %d' % channel)
+                log.debug('AWG disabled channel %d' % channel)
         else:
             raise AwgError('invalid channel')
 
@@ -176,7 +185,7 @@ class Sdg2000x():
         # returns True when Output is enabled and False if not
         if channel in (1, 2):
             answer = self.awgDev.write('C%d:OUTP?' % channel)
-            logger.debug('AWG channel %d status: %s' % (channel, str(answer)))
+            log.debug('AWG channel %d status: %s' % (channel, str(answer)))
             if len(answer) > 12:
                 state = answer.split(',')[0][9:]
                 if state == 'OFF':
@@ -185,11 +194,11 @@ class Sdg2000x():
                     return True
                 else:
                     msg = 'invalid state answer'
-                    logger.error(msg)
+                    log.error(msg)
                     raise AwgError(msg + ': ' + answer)
         else:
             msg = 'invalid channel: %s' % str(channel)
-            logger.error(msg)
+            log.error(msg)
             raise AwgError(msg)
     
 

@@ -1,4 +1,12 @@
-import LabJackPython, u3, struct, sys
+# -*- coding: utf-8 -*-
+"""
+@author: eschenm
+"""
+
+import LabJackPython
+import u3
+import struct
+import sys
 
 if sys.version_info > (3,):
     class LabJackError(Exception):

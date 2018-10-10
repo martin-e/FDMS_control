@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jun 14 20:20:37 2017
-
 @author: eschenm
 """
 
-import os, sys, h5py, logging
+import os
+import sys
+import h5py
+import logging
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches

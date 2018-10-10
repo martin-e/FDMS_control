@@ -1,12 +1,11 @@
-
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jun 15 09:22:53 2017
-
 @author: eschenm
 """
 
-import logging, sys, time
+import logging
+import sys
+import time
 import PyCapture2
 import numpy as np
 

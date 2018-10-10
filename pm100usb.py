@@ -17,6 +17,7 @@ else:
         pass
 
 log = logging.getLogger('pm100usb')
+logging.getLogger('pyvisa').setLevel(logging.WARNING)
 
 class Pm100usb():
     def __init__(self, pm100usb_ini, resourceName=''):
