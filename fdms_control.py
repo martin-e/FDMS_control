@@ -65,7 +65,9 @@ MEASURE_SURFACE = fdms_ini['MEASURE_SURFACE']
 SHOOT_DIMPLE = fdms_ini['SHOOT_DIMPLE']
 
 if MEASURE_SURFACE:
-    import camera, pidControl, measure_surface
+    import camera
+    import pidControl
+    import measure_surface
 
     log.info('setting up connections for measuring surface')
     u3 = pidControl.connectU3()
@@ -82,7 +84,7 @@ if MEASURE_SURFACE:
     while abs(ctrl.getError()) > piezo_ini['maxError']:
         if (time.time() - start) > 5:
             log.error('piezo not within errormargin after initialisation')
-            raise FdmsError('piezo not at setpoint after initialisation')
+            log.warning('piezo not at setpoint after initialisation')
         time.sleep(0.1)
     
     cam = camera.Camera(camera_ini)
@@ -90,7 +92,9 @@ if MEASURE_SURFACE:
     measure = measure_surface.Phase_stepping(piezo_ini, phase_stepping_ini, cam, ctrl, dailydir)
 
 if SHOOT_DIMPLE:
-    import sdg2000x, pm100usb, dimple_shooting
+    import sdg2000x
+    import pm100usb
+    import dimple_shooting
 
     log.info('setting up connections for shooting dimples')
     awg = sdg2000x.Sdg2000x(awg_ini)

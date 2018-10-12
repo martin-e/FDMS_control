@@ -20,6 +20,7 @@ class DimpleShooting():
         self.powermeter_ini = powermeter_ini
         self.awg_ini = awg_ini
         self.dimple_shooting_ini = dimple_shooting_ini
+        self.defaultHeight = 0
         if awg.isArmed == False:
             print('AWG is not armed')
             logging.warning('AWG is not armed')
@@ -28,38 +29,56 @@ class DimpleShooting():
             logging.warning('powermeter is not yet configured')
 
     def prepareShot(self, **kwargs):
+        '''prepareShot(width=1E-6, height=7.5, nr_pulses=1, period=5E-6)
+        
+        by default the values stored in the dimple_shooting section of fdms.ini are used
+        width:      [float] pulse width in s
+        height:     [float] pulse height 0 and 10V
+        nrPulses:   [int] number of pulses
+        period:     [float] multiple pulse period time in s
         '''
-        optional kwargs: (period=5E-6, width=1E-6, height=5V, nr_pulses=1)
-        '''
-        defaultPeriod = (self.dimple_shooting_ini['pulse'] + self.dimple_shooting_ini['length'])
-        period = kwargs.get('period', default=defaultPeriod)
-        if kwargs.get('period') is None:
-            msg = 'using non-default value for (pulse train) period: %E.3s' % period
-            print(msg)
-            logging.debug(msg)
+
+        txt = ['This value is taken from the ini file', '']
 
         defaultWidth = self.dimple_shooting_ini['width']
-        width = kwargs.get('width', default=defaultWidth)
-        if kwargs.get('width') is None:
-            msg = 'using non-default value for pulse width: %E.3s' % width
-            print(msg)
-            logging.debug(msg)
+        width = kwargs.get('width', defaultWidth)
+        msg = 'using value for pulse width: %.3Es %s' % (width, txt[kwargs.get('width') is None])
+        print(msg)
+        logging.info(msg)
 
-        defaultNrPulses = self.dimple_shooting_ini['nr_pulses']
-        cycles = int(kwargs.get('nr_pulses', default=defaultNrPulses))
-        if kwargs.get('nr_pulses') is None:
-            msg = 'using non-default value for number of pulses: %d' % int(nr_pulses)
-            print(msg)
-            logging.debug(msg)
+        defaultPeriod = self.dimple_shooting_ini['period']
+        period = kwargs.get('period', defaultPeriod)
+        msg = 'using value for (pulse train) period: %.3Es %s' % (period, txt[kwargs.get('period') is None])
+        print(msg)
+        logging.info(msg)
 
-        actualPower = self.powermeter.readPower()
-        height = kwargs.get('height', default=(currentPower / self.dimple_shooting_ini['default_power'] * self.dimple_shooting_ini['height']))
-        if kwargs.get('height') is None:
-            msg = 'using non-default value for number of pulse height: %.4fV' % height
-            print(msg)
-            logging.debug(msg)
+        cycles = int(kwargs.get('nr_pulses', self.dimple_shooting_ini['nr_pulses']))
+        msg = 'number of pulses: %d %s' % (cycles, txt[kwargs.get('nr_pulses') is None])
+        print(msg)
+        logging.info(msg)
+
+        height = kwargs.get('height', self.dimple_shooting_ini['default_height'])
+        msg = 'using value for pulse height: %.4fV %s' % (height, txt[kwargs.get('height') is None])
+        print(msg)
+        logging.info(msg)
         self.awg.setIntensity(height)
+        self.defaultHeight = height
         self.awg.prepareBurst(period, width, cycles)
         
-    def shoot(self):
+    def shoot(self, correctPower=True):
+        if self.awg.isArmed is False:
+            raise DimpleShootingError('cannot shoot laser pulse, make sure shoot.prepareShot() has been run with correct parameters!!')
+        if correctPower:
+            currentPower = self.powermeter.readPower()
+            correctedHeight = self.defaultHeight * (self.dimple_shooting_ini['default_power'] / currentPower)
+            msg = 'Measured actual powermeter value: %.4EW Corrected pulse height is %.3EV' % (currentPower, correctedHeight)
+            print(msg)
+            logging.info(msg)
+            self.awg.setIntensity(correctedHeight)
+        logging.info(msg)
+
         self.awg.sendBurst()
+        
+        # change pulse height setting back to non-powermeter corrected height value in case the next pulse wil be fired without height correction
+        if correctPower:
+            self.awg.setIntensity(self.defaultHeight)

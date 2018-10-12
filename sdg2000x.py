@@ -26,7 +26,7 @@ else:
     class AwgError(StandardError):
         pass
 
-log = logging.getlogger('SDG2000')
+log = logging.getLogger('SDG2000')
 logging.getLogger('pyvisa').setLevel(logging.WARNING)
 
 class Sdg2000x():
@@ -157,10 +157,14 @@ class Sdg2000x():
     def sendBurst(self):
         if not self.isArmed:
             raise AwgError('awg is not armed')
-        self.awgDev.write('C1:BTWV MTRIG')
-        log.info('triggered AWG')
-        time.sleep(self.duration)
-        self.setOutput(1, False)
+        try:
+            self.awgDev.write('C1:BTWV MTRIG')
+            log.info('triggered AWG')
+            time.sleep(self.duration)
+        except:
+            msg = 'error during attempt to shoot laser, disarm'
+            print(msg)
+            log.warning(msg)
         self.isArmed = False
         log.info('disarmed AWG')
 

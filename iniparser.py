@@ -68,7 +68,7 @@ def parseInifile(file):
 
     # reading dimple shooting settings
     dimple_shooting = dict()
-    floats = ('interval', 'length', 'default_power', )
+    floats = ('period', 'width', 'default_power', 'default_height')
     ints = ('nr_pulses', )
     for option in floats:
         dimple_shooting[option] = float(parser.get('dimple_shooting', option))
