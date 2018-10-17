@@ -115,7 +115,7 @@ class Pm100usb():
     def readPower(self):
         if self.isConfigured:
             power = self.pm100usb_dev.ask('READ?')
-            log.debug('measured power: %s' % power)
+            log.debug('measured power: %s' % power.strip())
             return float(power)
         else:
             msg = 'powermeter is not configured, run prepareSettings() first'

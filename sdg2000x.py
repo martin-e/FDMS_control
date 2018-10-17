@@ -101,7 +101,7 @@ class Sdg2000x():
         # set waveform for Channel 2 to DC offset
         self.awgDev.write('C2:BSWV WVTP, DC')
         self.awgDev.write('C2:BSWV OFST, 0.0V')
-        self.setOutput(2,True)
+        self.setOutput(2,False)
         self.awgDev.write('C1:BSWV WVTP, PULSE')
         self.awgDev.write('C1:BSWV LLEV, 0V')
         self.awgDev.write('C1:BSWV HLEV, 0.1V')
@@ -150,9 +150,12 @@ class Sdg2000x():
         self.awgDev.write('C1:BTWV TRSR, MAN')
         self.awgDev.write('C1:BTWV GATE_NCYC, NCYC')
         self.awgDev.write('C1:BTWV TIME, %d' % cycles)
+        self.setOutput(2,True)
         self.isArmed = True
         self.duration = cycles * period
-        log.info('AWG armed: period=%.5Es, width=%.5Es, cycles=%d and TTL height=%.4E' % (period, width, cycles, height))
+        msg ='AWG armed: width=%.5Es, nr of cycles=%d, period=%.5Es and TTL height=%.4E' % (width, cycles, period, height)
+        print(msg)
+        logging.info(msg)
 
     def sendBurst(self):
         if not self.isArmed:
@@ -160,11 +163,13 @@ class Sdg2000x():
         try:
             self.awgDev.write('C1:BTWV MTRIG')
             log.info('triggered AWG')
-            time.sleep(self.duration)
+            time.sleep(self.duration+0.01)
+            self.setOutput(2,False)
         except:
             msg = 'error during attempt to shoot laser, disarm'
             print(msg)
             log.warning(msg)
+        self.setOutput(2,False)
         self.isArmed = False
         log.info('disarmed AWG')
 

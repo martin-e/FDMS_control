@@ -32,13 +32,15 @@ class fdmsImage():
 		image.fitGauss()
         '''
         
-        logging.debug('start analysis of file %s' % filename)
+        msg = ('read contents of file %s' % filename)
+        print(msg)
+        logging.info(msg)
         if os.path.isfile(filename):
             filepath = os.path.realpath(filename)
         else:
             logging.error('could not find file %s' % filename)
             raise Exception('could not find file %s' % filename)
-        logging.info('reading file %s'  % filepath)
+        logging.debug('done reading file %s'  % filepath)
         
         try:
             with h5py.File(filepath,  "r") as hdf5File:
@@ -77,12 +79,13 @@ class fdmsImage():
             self.numStepAnalysis = useNrOfSteps
         else:
             self.numStepAnalysis = self.numSteps
-
         if self.numStepAnalysis > self.numSteps:
             self.numStepAnalysis = self.numSteps
             msg = 'stored file only contains %d interferograms!' % self.numSteps
             logging.warning(msg)
             print(msg)
+        logging.info('analyzing with %d number of steps. (stored in hdf5 file: %d)' % (self.numStepAnalysis, self.numSteps))
+
         if roi:
             self.roi = roi
             # simple checks for input sanity
@@ -96,6 +99,7 @@ class fdmsImage():
             if msg:
                 logging.error(msg)
                 raise Exception(msg)
+            logging.info('analyzing with roi: (%d, %d, %d, %d) (T,L,H,W)' % roi[:])
         self.scale = scale
         
         # average multiple images taken at eacht phase step
@@ -145,8 +149,7 @@ class fdmsImage():
             wrappedPhase = self.wrappedPhase
         
         # the unwrap_phase function unwraps phase between -pi and pi
-        # multiply with -1 to get correct sign (dimples are negative height)
-        self.unwrapped_phase = -1*unwrap_phase(wrappedPhase)
+        self.unwrapped_phase = unwrap_phase(wrappedPhase)
         
         # subtrace fitted 2d flat surface (detrend)
         # perform 2d gaussean fit on residual
@@ -156,6 +159,8 @@ class fdmsImage():
         
         self.height = self.unwrapped_phase/(np.pi*2) * self.wavelength/2 * 1e6
         
+        logging.info('calculating contrast, phase and phase unwrapping done')
+
     def plotInterferograms(self, interpolation="none"):
         if sys.version_info > (3,):
             filename = self.filename.decode()
@@ -168,7 +173,7 @@ class fdmsImage():
             print(msg)
             logging.error(msg)
             return
-        fig = plt.figure()
+        # fig = plt.figure()
         for ii in range(self.numSteps):
             plt.subplot(2, 4, ii+1)
             ax = plt.gca()
@@ -238,8 +243,15 @@ class fdmsImage():
         return self._plotData(self.height-np.max(self.height), title='height (µm)')
 
     def fitGauss(self, data = []):
+        # fits a 2D Gauss to a calculated height
         if not data:
-            data = self.height
+            try:
+                data = self.height
+            except AttributeError:
+                msg = 'ho height profile calculated yet'
+                logging.error(msg)
+                raise Exception(msg)
+                
         shape = np.shape(data)
         x = np.linspace(0, shape[1], shape[1])
         y = np.linspace(0, shape[0], shape[0])
@@ -249,17 +261,25 @@ class fdmsImage():
         # size of square for which corner intensities are averaged            
         bs = int(shape[0]/10)
         
-        # intensities at corners: [BL, BR, UL, UR]
+        # height at corners: [BL, BR, UL, UR]
         corners = [np.mean(data[:bs,:bs]), np.mean(data[:bs,-bs:]), np.mean(data[-bs:,:bs]), np.mean(data[-bs:,-bs:])]
         offset = np.mean(corners)
         amplitude = np.min(data)-offset
+        logging.debug('height at corners: %s' % str(corners))
+        logging.debug('found offset: %.1f and amplitude: %.1f' % (offset, amplitude))
         theta = 0
+
         #   center of mass:
         # (yo, xo) = center_of_mass(data)
-        minpos = np.where(data == np.min(data))
-        (yo, xo) = (minpos[0][0], minpos[1][0])
+
+        # minpos = np.where(data == np.min(data))
+        # (yo, xo) = (minpos[0][0], minpos[1][0])
+        
+        (yo, xo) = (np.int(shape[1]/2), np.int(shape[0]/2))
+        logging.debug('start values for x0 and y0: (%d, %d)' % (xo, yo))
         xtilt = (corners[1] - corners[0])/shape[1]/0.9
         ytilt = (corners[2] - corners[0])/shape[0]/0.9
+        logging.debug('found tilts: xtilt=%.3f and xtilt=%.3f' % (xtilt, ytilt))
         
         detrend_params = (0, xo, yo, 60, 60, theta, offset, xtilt, ytilt)
         trend = twoD_GaussianWithTilt((x,y), *detrend_params).reshape(shape)
@@ -277,9 +297,13 @@ class fdmsImage():
         sigma_y = 40
         
         initial_guess = (amplitude, xo, yo, sigma_x, sigma_y, theta, offset, xtilt, ytilt)
+        logging.debug('starting 2d Gauss fit with these initial parameters:')
+        logging.debug('amplitude, xo, yo, sigma_x, sigma_y, theta, offset, xtilt, ytilt')
+        logging.debug('%.3f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f' % (amplitude, xo, yo, sigma_x, sigma_y, theta, offset, xtilt, ytilt))
+
         ig = initial_guess
         shape = data.shape
-        txt = 'initial_guess: amplitude: %.3fµm\n\t\t(x0, y0): (%.1f, %.1f) µm\n\t\t(sigma_x, sigma_y): (%.2f, %.2f) µm\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f µm\n\t\t(xtilt, ytilt): (%.4f, %.4f) (µm/image length)'
+        txt = 'initial_guess: amplitude: %.3fµm\n\t\t(x0, y0): (%.1f, %.1f) µm\n\t\t(sigma_x, sigma_y): (%.2f, %.2f) µm\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f µm\n\t\t(xtilt, ytilt): (%.4f, %.4f) (µm/image)'
         x0 = self.scale*1e6 * (ig[1] - shape[1]/2)
         y0 = self.scale*1e6 * (ig[2] - shape[0]/2)
         sigma_x = ig[3]*1E6*self.scale
@@ -361,6 +385,7 @@ class fdmsImage():
         return val
         
     def _roc(self, sigma, depth):
+        # returns the radius of curvature for a given sigma and depth
         D = 2*np.sqrt(2) * sigma
         radius_curvature = D**2 / (8*depth)
         #with D = full width at height of 1/e

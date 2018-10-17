@@ -36,10 +36,10 @@ class Phase_stepping():
         image = self.cam.retrieveBuffer()
         pixformat = image.getPixelFormat()
         if pixformat == PyCapture2.PIXEL_FORMAT.MONO8:
-            dtype=np.uint8
+            dtype = np.uint8
             hdfDtype = dtype
         elif pixformat == PyCapture2.PIXEL_FORMAT.MONO16:
-            dtype=np.uint16
+            dtype = np.uint16
             hdfDtype = dtype
         else:
             for format in dir(PyCapture2.PIXEL_FORMAT):
@@ -67,13 +67,20 @@ class Phase_stepping():
             setpoints.append(self.piezo_ini['offset'] + ii*self.phase_stepping_ini['stepSize'])
         for ii in range(self.phase_stepping_ini['nrSteps']):
             self.ctrl.setSetpoint(setpoints[ii])
+            logging.debug('go to setpoint %.3f' % setpoints[ii])
             time.sleep(0.25)
-            self.waitForPosition(0.5)
+            self.waitForPosition(1)
             pvs.append(self.ctrl.getPv())
-            logging.debug('PID setpoint: %.4f current position: %.4f' % (setpoints[ii], pvs[-1]))
+            logging.info('PID setpoint: %.4f current position: %.4f' % (setpoints[ii], pvs[-1]))
             if abs(setpoints[ii] - pvs[-1]) > self.piezo_ini['maxError']:        
                 msg = 'current position %f deviates more from setpoint %f than tolerated!' % (pvs[-1], setpoints[ii])
                 logging.warning(msg)
+                print(msg)
+                time.sleep(1)
+                pvs.pop()
+                pvs.append(self.ctrl.getPv())
+                msg = 'after additional 1 second wait time: PID setpoint: %.4f current position: %.4f' % (setpoints[ii], pvs[-1])
+                logging.info(msg)
                 print(msg)
             # record number of images and store in hdf5 file
             for jj in range(self.phase_stepping_ini['nrImages']):
@@ -82,7 +89,7 @@ class Phase_stepping():
                 imageArray = np.fromstring(data, dtype)
                 imageStack[ii,jj,...] = imageArray.reshape([self.cam.fm7Settings.height, self.cam.fm7Settings.width])
                 timeStampStack[ii,jj] = self.cam.getImageTimestamp(image)
-            logging.debug('recorded %d images at step %d' % (jj+1, ii+1))         
+            logging.info('recorded %d images at step %d' % (jj+1, ii+1))         
     
         # set pid controller back to start position
         self.ctrl.setSetpoint(self.piezo_ini['offset'])

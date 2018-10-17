@@ -46,15 +46,16 @@ class DimpleShooting():
         print(msg)
         logging.info(msg)
 
-        defaultPeriod = self.dimple_shooting_ini['period']
-        period = kwargs.get('period', defaultPeriod)
-        msg = 'using value for (pulse train) period: %.3Es %s' % (period, txt[kwargs.get('period') is None])
-        print(msg)
-        logging.info(msg)
-
         cycles = int(kwargs.get('nr_pulses', self.dimple_shooting_ini['nr_pulses']))
         msg = 'number of pulses: %d %s' % (cycles, txt[kwargs.get('nr_pulses') is None])
         print(msg)
+        logging.info(msg)
+
+        defaultPeriod = self.dimple_shooting_ini['period']
+        period = kwargs.get('period', defaultPeriod)
+        msg = 'using value for (pulse train) period: %.3Es %s' % (period, txt[kwargs.get('period') is None])
+        if cycles > 1:
+            print(msg)
         logging.info(msg)
 
         height = kwargs.get('height', self.dimple_shooting_ini['default_height'])
@@ -71,14 +72,17 @@ class DimpleShooting():
         if correctPower:
             currentPower = self.powermeter.readPower()
             correctedHeight = self.defaultHeight * (self.dimple_shooting_ini['default_power'] / currentPower)
-            msg = 'Measured actual powermeter value: %.4EW Corrected pulse height is %.3EV' % (currentPower, correctedHeight)
+            msg = 'Measured actual powermeter value: %.3fW Corrected pulse height is %.3EV' % (currentPower, correctedHeight)
             print(msg)
             logging.info(msg)
             self.awg.setIntensity(correctedHeight)
-        logging.info(msg)
-
-        self.awg.sendBurst()
-        
-        # change pulse height setting back to non-powermeter corrected height value in case the next pulse wil be fired without height correction
-        if correctPower:
-            self.awg.setIntensity(self.defaultHeight)
+        try:
+            self.awg.sendBurst()
+        except err as Error:
+            msg = 'error during sending burst: %s' % err
+            logging.error(msg)
+            raise DimpleShootingError(msg)
+        finally:
+            # change pulse height setting back to non-powermeter corrected height value in case the next pulse wil be fired without height correction
+            if correctPower:
+                self.awg.setIntensity(self.defaultHeight)
