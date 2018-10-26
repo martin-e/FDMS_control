@@ -153,7 +153,7 @@ class Sdg2000x():
         self.setOutput(2,True)
         self.isArmed = True
         self.duration = cycles * period
-        msg ='AWG armed: width=%.5Es, nr of cycles=%d, period=%.5Es and TTL height=%.4E' % (width, cycles, period, height)
+        msg ='AWG armed: width=%.3Es, nr of cycles=%d, period=%.3Es and TTL height=%.3E' % (width, cycles, period, height)
         print(msg)
         logging.info(msg)
 

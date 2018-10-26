@@ -174,8 +174,12 @@ class fdmsImage():
             logging.error(msg)
             return
         # fig = plt.figure()
+        if self.numSteps == 5:
+            layout = (2, 3)
+        else:
+            layout = (2, 4)
         for ii in range(self.numSteps):
-            plt.subplot(2, 4, ii+1)
+            plt.subplot(*layout, ii+1)
             ax = plt.gca()
             plotdata = self.averagedImages[ii,...]
             ax.imshow(plotdata, cmap='gray', interpolation=interpolation)
