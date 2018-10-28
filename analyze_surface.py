@@ -194,7 +194,10 @@ class fdmsImage():
             plt.title(title)
             # gca().add_patch(patches.Rectangle( (100, 200),300,400,
             #                    fill=False, linestyle='dashed'))
-        ax = plt.subplot(248)
+        if self.numSteps == 5:
+            ax = plt.subplot(236)
+        else:
+            ax = plt.subplot(248)
         ax.axis('off')
         
         if hasattr(self, 'roi'):
@@ -207,6 +210,32 @@ class fdmsImage():
         plt.show()
         return plt.gcf()
 
+    def plotAllInterferograms(self, interpolation="none"):
+        if sys.version_info > (3,):
+            filename = self.filename.decode()
+        else:
+            filename = self.filename
+        (nrSteps, nrImages, rows, cols) = np.shape(self.images)
+        for ii in range(nrSteps):
+            for jj in range(nrImages):
+                nrPlot = ii*nrSteps + jj
+                plt.subplot(nrSteps, nrImages, nrPlot+1)
+                ax = plt.gca()
+                plotdata = self.images[ii,jj,...]
+                ax.imshow(plotdata, cmap='gray', interpolation=interpolation)
+                if hasattr(self, 'roi'):
+                    roi = self.roi
+                    rect = patches.Rectangle((roi[1],roi[0]),roi[3],roi[2], \
+                                             linewidth=1,edgecolor='r',facecolor='none')
+                    ax.add_patch(rect)
+                title = ('step: %d image: %d' % (ii, jj))
+                plt.title(title)
+        plt.show()
+        # return plt.gcf()
+        return
+
+                
+        
     def _plotData(self, data, title='', interpolation="none"):
         if sys.version_info > (3,):
             filename = self.filename.decode()
