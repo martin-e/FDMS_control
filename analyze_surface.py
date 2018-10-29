@@ -99,19 +99,19 @@ class fdmsImage():
             if msg:
                 logging.error(msg)
                 raise Exception(msg)
-            logging.info('analyzing with roi: (%d, %d, %d, %d) (T,L,H,W)' % roi[:])
+            logging.info('analyzing with roi: (%d, %d, %d, %d) (T,L,H,W)' % tuple(roi))
         self.scale = scale
         
         # average multiple images taken at eacht phase step
         self.averagedImages = np.mean(self.images[:,2:3,...],1)
         img = self.averagedImages
         if self.numStepAnalysis == 5:
-            # phase
+            # phase according to Schwider-Hariharan Algorithm
             nom = (-2*img[1,...] + 2*img[3,...])
             denom = (img[0,...] - 2*img[2,...] + img[4,...])
             self.wrappedPhase = np.arctan2(nom, denom)
     
-            # contrast
+            # contrast according to Schwider-Hariharan Algorithm
             term1 = np.power((img[1,...] - img[3,...]), 2)
             term2 = np.power((img[0,...] -2*img[2,...] + img[4,...]), 2)
             nom = 2*np.power(4*term1 + term2, 0.5)
@@ -124,7 +124,7 @@ class fdmsImage():
             denom =  (img[0,...] -4*img[2,...] + 3*img[4,...])
             self.wrappedPhase = np.arctan2(nom, denom)
     
-            # contrast (based on first 5 images)
+            # contrast (based on first 5 images, Schwider-Hariharan Algorithm)
             term1 = np.power((img[1,...] - img[3,...]), 2)
             term2 = np.power((img[0,...] -2*img[2,...] + img[4,...]), 2)
             nom = 2*np.power(4*term1 + term2, 0.5)
@@ -132,11 +132,12 @@ class fdmsImage():
             self.contrast =  nom / denom
     
         if self.numStepAnalysis == 7:
+            # phase
             nom = 4*(img[1,...] - 2*img[3,...] + img[5,...])
             denom = (-img[0,...] + 7*img[2,...] - 7*img[4,...] + img[6,...])
             self.wrappedPhase = np.arctan2(nom, denom)
      
-            # contrast (based on first 5 images)
+            # contrast (based on first 5 images, Schwider-Hariharan Algorithm)
             term1 = np.power((img[1,...] - img[3,...]), 2)
             term2 = np.power((img[0,...] -2*img[2,...] + img[4,...]), 2)
             nom = 2*np.power(4*term1 + term2, 0.5)
@@ -207,8 +208,29 @@ class fdmsImage():
         txt = '%s\n%s\nusing %d images' % (str(filename), roitxt, self.numStepAnalysis)
 
         ax.text(0.05,0.5, txt, fontsize=11)
-        plt.show()
+        plt.show(block=False)
         return plt.gcf()
+
+    def plotPhaseStepper(self, ):
+        try:
+            roi = self.roi
+        except AttributeError:
+            error('no roi specified, run analyzeSurface')
+        img = self.averagedImages
+        nom = (img[4,...] - img[0,...])
+        denom =  2*(img[3,...] - img[1,...])
+        phaseStep = np.arccos(nom/denom)[roi[0]:roi[0]+roi[2], roi[1]:roi[1]+roi[3]]
+        self._plotData(phaseStep/np.pi*180, title='average phase step (deg)')
+        idx = np.logical_not(np.isnan(phaseStep))
+        phaseMean = np.mean(phaseStep[idx].reshape(-1))/np.pi*180
+        phaseStd = np.std(phaseStep[idx].reshape(-1))/np.pi*180
+        print('Phase step calibration info:\n\tmean phase step value: %.3f*Pi deg\n\tstandard deviation: %.2f*Pi deg' % (phaseMean, phaseStd))
+        plt.figure
+        plt.hist(phaseStep[idx].reshape(-1)/np.pi*180, 100)
+        plt.xlabel('phase step (deg)')
+        plt.ylabel('nr. (-)')
+        plt.title('phase step mean: %.3f deg std:  %.3f deg' % (phaseMean, phaseStd))
+        plt.show(block=False)
 
     def plotAllInterferograms(self, interpolation="none"):
         if sys.version_info > (3,):
@@ -230,12 +252,10 @@ class fdmsImage():
                     ax.add_patch(rect)
                 title = ('step: %d image: %d' % (ii, jj))
                 plt.title(title)
-        plt.show()
+        plt.show(block=False)
         # return plt.gcf()
         return
 
-                
-        
     def _plotData(self, data, title='', interpolation="none"):
         if sys.version_info > (3,):
             filename = self.filename.decode()
@@ -258,7 +278,7 @@ class fdmsImage():
         plt.ylabel('position (µm)')
         plt.colorbar()
         plt.title(title)
-        plt.show()
+        plt.show(block=False)
         return plot
         
     def plotContrast(self):
@@ -273,7 +293,7 @@ class fdmsImage():
         return self._plotData(self.unwrapped_phase, title='unwrapped phase (rad)')
     
     def plotHeight(self):
-        return self._plotData(self.height-np.max(self.height), title='height (µm)')
+        return self._plotData(self.height-self.height[1,1], title='height (µm)')
 
     def fitGauss(self, data = []):
         # fits a 2D Gauss to a calculated height
