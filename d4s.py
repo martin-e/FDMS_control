@@ -3,11 +3,12 @@ def get_d4sigma(array, pix_size):
     
     returns the d4sigma as well as the centroids for X and Y
     array:    2D numpy array with data
-    pix_size:   pixel size; square pixels are assumed'''
+    pix_size:   pixel size; square pixels are assumed
+    important: background is zero on average!!!   '''
     
     import numpy as np
     
-    f_x, f_y = array.shape
+    f_y, f_x = array.shape
     
     #(uses 'D4sigma or second moment width' from wikipedia
     #get centroids

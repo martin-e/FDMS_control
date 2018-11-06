@@ -14,6 +14,7 @@ import matplotlib.patches as patches
 import scipy.optimize as opt
 from skimage.restoration import unwrap_phase
 from twoD_Gaussian import twoD_GaussianWithTilt
+from d4s import get_d4sigma
 # from scipy.ndimage.measurements import center_of_mass
 
 class fdmsImage():
@@ -334,35 +335,33 @@ class fdmsImage():
         xtilt = (np.mean(corners[1::2]) - np.mean(corners[0::2]))*(self.scale*shape[1])*2000
         ytilt = (np.mean(corners[2:4]) - np.mean(corners[0:2]))*(self.scale*shape[0])*2000
         logging.debug('height at corners: %s' % str(corners))
-        logging.debug('tilt estimates: xtilt=%.3e and ytilt=%.3e  (mrad)' % (xtilt, ytilt))
+        logging.debug('found offset: %+.2E' % (offset, ))
+        logging.debug('tilt estimates: xtilt=%+.3e and ytilt=%+.3e  (mrad)' % (xtilt, ytilt))
         theta = 0
 
-        #   center of mass:
-        # (yo, xo) = center_of_mass(data)
         (yo, xo) = (0, 0)
-        logging.debug('start values for x0 and y0: (%d, %d)' % (xo, yo))
-
-        amplitude = np.min(data)-offset
-        logging.debug('found offset: %.2E and amplitude: %.2E' % (offset, amplitude))
-        
         detrend_params = (0, xo, yo, 4, 4, theta, offset, xtilt, ytilt)
         trend = twoD_GaussianWithTilt((x,y, self.scale), *detrend_params).reshape(shape)
-        # perform rough detrend so sigma can be estimated
+        # perform rough detrend so amplitude and sigma can be estimated
         detrended_data = data - trend
         # height at corners: [BL, BR, UL, UR]
         detr_corners = [np.mean(detrended_data[:bs,:bs]),  np.mean(detrended_data[:bs,-bs:]), \
                         np.mean(detrended_data[-bs:,:bs]), np.mean(detrended_data[-bs:,-bs:])]
         amplitude = np.min(detrended_data) - np.mean(detr_corners)
+        logging.debug('found amplitude: %.2E' % (amplitude))
+        (d4s_x, d4s_y, xo_px, yo_px) = get_d4sigma(detrended_data, 1)
+        if np.isnan(np.array([d4s_x, d4s_y, xo_px, yo_px])).any():
+            sigma_x, sigma_y = 3, 3
+            xo, yo = 0, 0
+            logging.debug('could not estimate sigma from height profile, use defaults: %.2E %.2E' % (sigma_x, sigma_y))
+        else:
+            sigma_x = d4s_x * self.scale / 4 * 1E6
+            sigma_y = d4s_y * self.scale / 4 * 1E6
+            xo = x[0, int(round(xo_px))]
+            yo = y[int(round(yo_px)), 0]
+            logging.debug('estimated sigma: %.2E %.2E' % (sigma_x, sigma_y))
+            logging.debug('estimated centroid: %.2E %.2E' % (xo, yo))
         
-        '''
-        # See https://en.wikipedia.org/wiki/Beam_diameter
-        x_sum = np.cumsum(np.mean(detrended_data-np.min(detrended_data), axis=1))
-        y_sum = np.cumsum(np.mean(detrended_data-np.min(detrended_data), axis=0))
-        x_sum /= x_sum
-        y_sum /= y_sum'''
-
-        sigma_x = 5  # hardcoded, needs better quick estimation
-        sigma_y = 5
         initial_guess = (amplitude, xo, yo, sigma_x, sigma_y, theta, offset, xtilt, ytilt)
         ig = initial_guess
         shape = data.shape
@@ -381,7 +380,7 @@ class fdmsImage():
         self.popt = popt
         
         txt = '\t\tamplitude: %.3fum\n\t\t(x0, y0): (%.2f, %.2f) um\n\t\t(sigma_x, sigma_y): (%.4f, %.4f) um\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f um\n\t\tbackground tilt (x, y): (%.3E, %.3E) (mrad)'
-        theta_deg = popt[5]/np.pi*180
+        theta_deg = np.mod(popt[5]/np.pi*180, 360)
         vals = (popt[0], popt[1], popt[2], popt[3], popt[4], theta_deg, popt[6], popt[7], popt[8])
         
         print('found fit params:')
@@ -398,16 +397,20 @@ class fdmsImage():
             img = self._plotData(initial_guessSurf, title='initial guessed parameters')
             title = 'fitted Gauss (with tilt) (um)\ndepth: %.2fum, sigma: (%.3f HOR and %.3f VER)um' % (popt[0], self.sigma[0], self.sigma[1])
             img = self._plotData(data_fitted, title=title)
-            img = self._plotData(data-data_fitted, title='fit residual (um)')
+            img = self._plotData(data-data_fitted, title='fit residual (um) - stdev: %.2E (um)'%np.std(data-data_fitted))
         
         roc_x = self._roc(popt[3]*1E6*self.scale, self.popt[0])
         roc_y = self._roc(popt[4]*1E6*self.scale, self.popt[0])
         self.radiiOfCurvature = (roc_x, roc_y)
         
-        msg = 'calculated radii of curvature: %.3f and %.3f um' % self.radiiOfCurvature
-        print(msg)
-        logging.info(msg)
+        msg1 = 'calculated radii of curvature: %.3f and %.3f um' % self.radiiOfCurvature
+        print(msg1)
+        logging.info(msg1)
         
+        msg2 = 'residual standard deviation: %.2E (um)' % np.std(data-data_fitted)
+        print(msg2, '\n\n')
+        logging.info(msg2)
+
         fp = self.filepath
         fn = self.filename[:15].decode() + '_fit_at_' + analysisTime + '.txt'
 
@@ -417,7 +420,8 @@ class fdmsImage():
                 f.write('analsis timestamp: %s\n\n' % analysisTime)
                 f.write('2D Gauss fit params:\n')
                 f.write('%s\n' % (txt % vals))
-                f.write(msg)
+                f.write(msg1)
+                f.write(msg2+'\n\n')
                 logging.info('wrote output to file %s' % os.path.join(fp, fn))
             except Exception as error:
                 logging.error('error during writing to file %s: %s' % (os.path.join(fp, fn), error))
