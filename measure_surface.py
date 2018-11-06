@@ -106,6 +106,7 @@ class Phase_stepping():
         f.close()
         logging.debug('closed hdf5 file')
         self.cam.stopCapture()
+        return HDF5_FILE
     
     def waitForPosition(self, timeout=10):
         start = time.time()

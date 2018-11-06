@@ -5,6 +5,7 @@
 
 import os
 import sys
+import time
 import h5py
 import logging
 import numpy as np
@@ -40,13 +41,10 @@ class fdmsImage():
         else:
             logging.error('could not find file %s' % filename)
             raise Exception('could not find file %s' % filename)
-        logging.debug('done reading file %s'  % filepath)
+
         
         try:
             with h5py.File(filepath,  "r") as hdf5File:
-                self.filename = os.path.split(filepath)[1]
-                self.filename = filepath
-                
                 logging.debug('file opened for reading')
                 # read contents of hdf5 file
                 
@@ -57,12 +55,13 @@ class fdmsImage():
                 self.numImages  = hdf5File['images'].attrs['numImages']
                 self.numSteps   = hdf5File['images'].attrs['numSteps']
                 self.filename   = hdf5File['images'].attrs['filename']
+                self.filepath   = os.path.split(filepath)[0]
                 self.wavelength = getattr(hdf5File['images'], 'wavelength', 635E-9)
-
         except Exception as error:
             logging.error('error during reading file %s: %s' % (filepath, error))
             raise Exception(error)
-
+        logging.debug('done reading file %s'  % filepath)
+        
     def analyzeSurface(self, useNrOfSteps=None, roi=None, scale=0.1172E-6):
         ''' 
         Calculates height profile from stored surface interferogram.
@@ -72,7 +71,7 @@ class fdmsImage():
                         whole image
         scale=F         dimension of image pixel in the fiber plane. Default is 
                         117 nm with the Mitutoyo 50X and 200 mm tube lens and 
-                        5.86 µm detector pixels
+                        5.86 um detector pixels
         '''
         
         if useNrOfSteps:
@@ -158,7 +157,8 @@ class fdmsImage():
         # calculate ellipticity
         # look at Tomas's plot
         
-        self.height = self.unwrapped_phase/(np.pi*2) * self.wavelength/2 * 1e6
+        self.height = self.unwrapped_phase/(np.pi*2) * self.wavelength/2 * 1e6 * -1
+        self.height -= self.height[0, 0]
         
         logging.info('calculating contrast, phase and phase unwrapping done')
 
@@ -238,9 +238,11 @@ class fdmsImage():
         else:
             filename = self.filename
         (nrSteps, nrImages, rows, cols) = np.shape(self.images)
+
         for ii in range(nrSteps):
             for jj in range(nrImages):
-                nrPlot = ii*nrSteps + jj
+                nrPlot = ii*nrImages + jj
+                # print('ii: %d   jj: %d  nrPlot: %d' %(ii, jj, nrPlot))
                 plt.subplot(nrSteps, nrImages, nrPlot+1)
                 ax = plt.gca()
                 plotdata = self.images[ii,jj,...]
@@ -274,8 +276,8 @@ class fdmsImage():
         extent.append(extentX[0])
         extent.append(extentX[1])
         plt.imshow(data, interpolation=interpolation, extent=extent, aspect='auto')
-        plt.xlabel('position (µm)')
-        plt.ylabel('position (µm)')
+        plt.xlabel('position (um)')
+        plt.ylabel('position (um)')
         plt.colorbar()
         plt.title(title)
         plt.show(block=False)
@@ -293,21 +295,32 @@ class fdmsImage():
         return self._plotData(self.unwrapped_phase, title='unwrapped phase (rad)')
     
     def plotHeight(self):
-        return self._plotData(self.height-self.height[1,1], title='height (µm)')
+        return self._plotData(self.height-self.height[1,1], title='height (um)')
 
-    def fitGauss(self, data = []):
-        # fits a 2D Gauss to a calculated height
-        if not data:
+    def fitGauss(self, data=np.array([]), scale=0.1172E-6):
+        '''fits a 2D Gauss to a calculated height
+        
+        data    2D array with height profile
+        scale=F dimension of image pixel in the fiber plane. Default is 
+                117 nm with the Mitutoyo 50X and 200 mm tube lens and 
+                5.86 um detector pixels
+        '''
+        
+        analysisTime = time.strftime('%Y%m%dT%H%M%S')
+        if not data.any():
             try:
                 data = self.height
             except AttributeError:
                 msg = 'ho height profile calculated yet'
                 logging.error(msg)
                 raise Exception(msg)
-                
+        else:
+            logging.debug('using manually entered height profile') 
         shape = np.shape(data)
-        x = np.linspace(0, shape[1], shape[1])
-        y = np.linspace(0, shape[0], shape[0])
+        x = np.linspace(0, shape[1], shape[1]) * self.scale *1e6
+        x = x-np.mean(x)
+        y = np.linspace(0, shape[0], shape[0]) * self.scale *1e6
+        y = y-np.mean(y)
         x, y = np.meshgrid(x, y)
         
         # calculate initial estimages
@@ -317,84 +330,99 @@ class fdmsImage():
         # height at corners: [BL, BR, UL, UR]
         corners = [np.mean(data[:bs,:bs]), np.mean(data[:bs,-bs:]), np.mean(data[-bs:,:bs]), np.mean(data[-bs:,-bs:])]
         offset = np.mean(corners)
-        amplitude = np.min(data)-offset
+        # estimating tilt in mrad
+        xtilt = (np.mean(corners[1::2]) - np.mean(corners[0::2]))*(self.scale*shape[1])*2000
+        ytilt = (np.mean(corners[2:4]) - np.mean(corners[0:2]))*(self.scale*shape[0])*2000
         logging.debug('height at corners: %s' % str(corners))
-        logging.debug('found offset: %.1f and amplitude: %.1f' % (offset, amplitude))
+        logging.debug('tilt estimates: xtilt=%.3e and ytilt=%.3e  (mrad)' % (xtilt, ytilt))
         theta = 0
 
         #   center of mass:
         # (yo, xo) = center_of_mass(data)
-
-        # minpos = np.where(data == np.min(data))
-        # (yo, xo) = (minpos[0][0], minpos[1][0])
-        
-        (yo, xo) = (np.int(shape[1]/2), np.int(shape[0]/2))
+        (yo, xo) = (0, 0)
         logging.debug('start values for x0 and y0: (%d, %d)' % (xo, yo))
-        xtilt = (corners[1] - corners[0])/shape[1]/0.9
-        ytilt = (corners[2] - corners[0])/shape[0]/0.9
-        logging.debug('found tilts: xtilt=%.3f and xtilt=%.3f' % (xtilt, ytilt))
+
+        amplitude = np.min(data)-offset
+        logging.debug('found offset: %.2E and amplitude: %.2E' % (offset, amplitude))
         
-        detrend_params = (0, xo, yo, 60, 60, theta, offset, xtilt, ytilt)
-        trend = twoD_GaussianWithTilt((x,y), *detrend_params).reshape(shape)
+        detrend_params = (0, xo, yo, 4, 4, theta, offset, xtilt, ytilt)
+        trend = twoD_GaussianWithTilt((x,y, self.scale), *detrend_params).reshape(shape)
         # perform rough detrend so sigma can be estimated
         detrended_data = data - trend
-        # fix with accurate integrals from Bastiaan
-        # See https://en.wikipedia.org/wiki/Beam_diameter
+        # height at corners: [BL, BR, UL, UR]
+        detr_corners = [np.mean(detrended_data[:bs,:bs]),  np.mean(detrended_data[:bs,-bs:]), \
+                        np.mean(detrended_data[-bs:,:bs]), np.mean(detrended_data[-bs:,-bs:])]
+        amplitude = np.min(detrended_data) - np.mean(detr_corners)
         
+        '''
+        # See https://en.wikipedia.org/wiki/Beam_diameter
         x_sum = np.cumsum(np.mean(detrended_data-np.min(detrended_data), axis=1))
         y_sum = np.cumsum(np.mean(detrended_data-np.min(detrended_data), axis=0))
         x_sum /= x_sum
-        y_sum /= y_sum
+        y_sum /= y_sum'''
 
-        sigma_x = 40  # hardcoded, needs better quick estimation
-        sigma_y = 40
-        
+        sigma_x = 5  # hardcoded, needs better quick estimation
+        sigma_y = 5
         initial_guess = (amplitude, xo, yo, sigma_x, sigma_y, theta, offset, xtilt, ytilt)
-        logging.debug('starting 2d Gauss fit with these initial parameters:')
-        logging.debug('amplitude, xo, yo, sigma_x, sigma_y, theta, offset, xtilt, ytilt')
-        logging.debug('%.3f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f' % (amplitude, xo, yo, sigma_x, sigma_y, theta, offset, xtilt, ytilt))
-
         ig = initial_guess
         shape = data.shape
-        txt = 'initial_guess: amplitude: %.3fµm\n\t\t(x0, y0): (%.1f, %.1f) µm\n\t\t(sigma_x, sigma_y): (%.2f, %.2f) µm\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f µm\n\t\t(xtilt, ytilt): (%.4f, %.4f) (µm/image)'
-        x0 = self.scale*1e6 * (ig[1] - shape[1]/2)
-        y0 = self.scale*1e6 * (ig[2] - shape[0]/2)
-        sigma_x = ig[3]*1E6*self.scale
-        sigma_y = ig[4]*1E6*self.scale
+        txt = 'initial_guess: amplitude: %.3fum\n\t\t(x0, y0): (%.1f, %.1f) um\n\t\t(sigma_x, sigma_y): (%.2f, %.2f) um\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f um\n\t\tbackground tilt (x, y): (%.3E, %.3E) (mrad)'
         theta_deg = ig[5]/np.pi*180
-
-        vals = (ig[0], x0, y0, sigma_x, sigma_y, theta_deg, ig[6], ig[7], ig[8])
-        # print(txt % vals)
-        initial_guessSurf = twoD_GaussianWithTilt((x, y), *initial_guess).reshape(shape)
-        popt, pcov = opt.curve_fit(twoD_GaussianWithTilt, (x, y), data.ravel(), p0=initial_guess)
-        data_fitted = twoD_GaussianWithTilt((x, y), *popt).reshape(shape)
+        vals = (ig[0], ig[1], ig[2], ig[3], ig[4], theta_deg, ig[6], ig[7], ig[8])
+        print(txt % vals)
+        logging.debug('starting 2d Gauss fit with these initial parameters:')
+        for line in (txt % vals).splitlines():
+            logging.info(line)
+        
+        initial_guessSurf = twoD_GaussianWithTilt((x, y, self.scale), *initial_guess).reshape(shape)
+        popt, pcov = opt.curve_fit(twoD_GaussianWithTilt, (x, y, self.scale), data.ravel(), p0=initial_guess)
+        data_fitted = twoD_GaussianWithTilt((x, y, self.scale), *popt).reshape(shape)
         self.data_fitted = data_fitted
         self.popt = popt
         
-        txt = 'found fit params: amplitude: %.3fµm\n\t\t(x0, y0): (%.1f, %.1f) µm\n\t\t(sigma_x, sigma_y): (%.2f, %.2f) µm\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f µm\n\t\t(xtilt, ytilt): (%.4f, %.4f) (µm/image length)'
-        x0 = self.scale*1e6 * (popt[1] - shape[1]/2)
-        y0 = self.scale*1e6 * (popt[2] - shape[0]/2)
-        sigma_x = popt[3]*1E6*self.scale
-        sigma_y = popt[4]*1E6*self.scale
+        txt = '\t\tamplitude: %.3fum\n\t\t(x0, y0): (%.2f, %.2f) um\n\t\t(sigma_x, sigma_y): (%.4f, %.4f) um\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f um\n\t\tbackground tilt (x, y): (%.3E, %.3E) (mrad)'
         theta_deg = popt[5]/np.pi*180
-        vals = (popt[0], x0, y0, sigma_x, sigma_y, theta_deg, popt[6], popt[7], popt[8])
+        vals = (popt[0], popt[1], popt[2], popt[3], popt[4], theta_deg, popt[6], popt[7], popt[8])
         
+        print('found fit params:')
         print(txt % vals)
+        logging.info('found fit parameters:')
+        for line in (txt % vals).splitlines():
+            logging.info(line)
         self.dimpleDepth = popt[0]
-        self.sigma = (popt[3]*self.scale*1E6, popt[4]*self.scale*1E6)
+        self.sigma = (popt[3], popt[4])
         
         if 1:
-            img = self._plotData(detrended_data, title='tilt removed from data (µm)')
+            img = self._plotData(data, title='measured height profile (um)')
+            img = self._plotData(detrended_data, title='tilt removed from data (um)')
             img = self._plotData(initial_guessSurf, title='initial guessed parameters')
-            title = 'fitted Gauss (with tilt) (µm)\ndepth: %.2fµm, sigma: (%.3f HOR and %.3f VER)µm' % (popt[0], self.sigma[0], self.sigma[1])
+            title = 'fitted Gauss (with tilt) (um)\ndepth: %.2fum, sigma: (%.3f HOR and %.3f VER)um' % (popt[0], self.sigma[0], self.sigma[1])
             img = self._plotData(data_fitted, title=title)
-            img = self._plotData(data-data_fitted, title='fit residual  (µm)')
+            img = self._plotData(data-data_fitted, title='fit residual (um)')
         
         roc_x = self._roc(popt[3]*1E6*self.scale, self.popt[0])
         roc_y = self._roc(popt[4]*1E6*self.scale, self.popt[0])
         self.radiiOfCurvature = (roc_x, roc_y)
-        print('calculated radii of curvature: %.3f and %.3f µm' % self.radiiOfCurvature)
+        
+        msg = 'calculated radii of curvature: %.3f and %.3f um' % self.radiiOfCurvature
+        print(msg)
+        logging.info(msg)
+        
+        fp = self.filepath
+        fn = self.filename[:15].decode() + '_fit_at_' + analysisTime + '.txt'
 
+        with open(os.path.join(fp, fn), 'w') as f:
+            try:
+                f.write('file: %s\n' % self.filename)
+                f.write('analsis timestamp: %s\n\n' % analysisTime)
+                f.write('2D Gauss fit params:\n')
+                f.write('%s\n' % (txt % vals))
+                f.write(msg)
+                logging.info('wrote output to file %s' % os.path.join(fp, fn))
+            except Exception as error:
+                logging.error('error during writing to file %s: %s' % (os.path.join(fp, fn), error))
+                raise Exception(error)
+                
     def fitCosine(self, roi, plotfit=False):
         '''roi in (X, Y, W, H)
         returns amplitude and phase'''

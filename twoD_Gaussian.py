@@ -3,7 +3,7 @@ import numpy as np
 def twoD_GaussianWithTilt(xdata_tuple, amplitude, xo, yo, sigma_x, sigma_y, theta, offset, tiltX, tiltY):
     ''' twoD_GaussianWithTilt(xdata_tuple, amplitude, xo, yo, sigma_x, sigma_y, theta, offset, tiltX, tiltY) 
     '''
-    (x,  y) = xdata_tuple
+    (x,  y, scale) = xdata_tuple
     xo = float(xo)
     yo = float(yo)
     tiltX = float(tiltX)
