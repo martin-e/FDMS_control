@@ -1,5 +1,5 @@
 # FDMS_control
-# Martin Eschen  (C) 2017
+# Martin Eschen  (C) 2017 - 2018
 
 Control software for precise dose control of a pulsed laser as 
 well as measuring microscopic surface using a phase stepped 
