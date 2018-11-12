@@ -68,7 +68,7 @@ class fdmsImage():
         Calculates height profile from stored surface interferogram.
         useNrOfSteps=N  specify if only the first N images are to be used for 
                         analysis
-        roi=(T,L,H,W)   specify ROI as (left, top, width, height) Default is 
+        roi=(T,L,H,W)   specify ROI as (top, left, height, width) Default is 
                         whole image
         scale=F         dimension of image pixel in the fiber plane. Default is 
                         117 nm with the Mitutoyo 50X and 200 mm tube lens and 
@@ -103,7 +103,7 @@ class fdmsImage():
         self.scale = scale
         
         # average multiple images taken at eacht phase step
-        self.averagedImages = np.mean(self.images[:,2:3,...],1)
+        self.averagedImages = np.mean(self.images[:,0:3,...],1)
         img = self.averagedImages
         if self.numStepAnalysis == 5:
             # phase according to Schwider-Hariharan Algorithm
@@ -175,7 +175,7 @@ class fdmsImage():
             print(msg)
             logging.error(msg)
             return
-        # fig = plt.figure()
+        fig = plt.figure()
         if self.numSteps == 5:
             layout = (2, 3)
         else:
@@ -203,7 +203,7 @@ class fdmsImage():
         ax.axis('off')
         
         if hasattr(self, 'roi'):
-            roitxt = 'ROI(X,Y,W,H): (%d,%d,%d,%d)' % (roi[1],roi[0],roi[3],roi[2])
+            roitxt = 'ROI(T,L,H,W): (%d,%d,%d,%d)' % (roi[0],roi[1],roi[2],roi[3])
         else:
             roitxt = 'no ROI defined'
         txt = '%s\n%s\nusing %d images' % (str(filename), roitxt, self.numStepAnalysis)
@@ -222,11 +222,12 @@ class fdmsImage():
         denom =  2*(img[3,...] - img[1,...])
         phaseStep = np.arccos(nom/denom)[roi[0]:roi[0]+roi[2], roi[1]:roi[1]+roi[3]]
         self._plotData(phaseStep/np.pi*180, title='average phase step (deg)')
+        plt.show(block=False)
         idx = np.logical_not(np.isnan(phaseStep))
         phaseMean = np.mean(phaseStep[idx].reshape(-1))/np.pi*180
         phaseStd = np.std(phaseStep[idx].reshape(-1))/np.pi*180
-        print('Phase step calibration info:\n\tmean phase step value: %.3f*Pi deg\n\tstandard deviation: %.2f*Pi deg' % (phaseMean, phaseStd))
-        plt.figure
+        print('Phase step calibration info:\n\tmean phase step value: %.3f deg\n\tstandard deviation: %.2f deg' % (phaseMean, phaseStd))
+        fig = plt.figure()
         plt.hist(phaseStep[idx].reshape(-1)/np.pi*180, 100)
         plt.xlabel('phase step (deg)')
         plt.ylabel('nr. (-)')
@@ -312,7 +313,7 @@ class fdmsImage():
             try:
                 data = self.height
             except AttributeError:
-                msg = 'ho height profile calculated yet'
+                msg = 'ho height profile calculated yet, run AnalyzeSurface() first'
                 logging.error(msg)
                 raise Exception(msg)
         else:
@@ -380,7 +381,7 @@ class fdmsImage():
         self.popt = popt
         
         txt = '\t\tamplitude: %.3fum\n\t\t(x0, y0): (%.2f, %.2f) um\n\t\t(sigma_x, sigma_y): (%.4f, %.4f) um\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f um\n\t\tbackground tilt (x, y): (%.3E, %.3E) (mrad)'
-        theta_deg = np.mod(popt[5]/np.pi*180, 360)
+        theta_deg = np.mod(popt[5]/np.pi*180, 180)
         vals = (popt[0], popt[1], popt[2], popt[3], popt[4], theta_deg, popt[6], popt[7], popt[8])
         
         print('found fit params:')
@@ -388,8 +389,24 @@ class fdmsImage():
         logging.info('found fit parameters:')
         for line in (txt % vals).splitlines():
             logging.info(line)
+        
+        # calculate centroid coordinates in detector pixels
+        mnx, mxx = np.min(x), np.max(x)
+        mny, mxy = np.min(y), np.max(y)
+        if hasattr(self, 'roi'):
+            self.x_detector = (popt[1]-mnx)/(mxx-mnx)*(x.shape[1]) + self.roi[1]
+            self.y_detector = (popt[2]-mny)/(mxy-mny)*(y.shape[0]) + self.roi[0]
+        else:
+            self.x_detector = (popt[1]-mnx)/(mxx-mnx)*(x.shape[1]-1)
+            self.y_detector = (popt[2]-mny)/(mxy-mny)*(y.shape[0]-1)
+        
+        txt2 = 'centroid location in detector pixels: (%.1f, %.1f)  (left, top)'% (self.x_detector, self.y_detector)
+        print(txt2)
+        logging.info(txt2)
+        
         self.dimpleDepth = popt[0]
         self.sigma = (popt[3], popt[4])
+        self.dimpleDiameter = (self._diameter(popt[3]), self._diameter(popt[4]))
         
         if 1:
             img = self._plotData(data, title='measured height profile (um)')
@@ -399,29 +416,45 @@ class fdmsImage():
             img = self._plotData(data_fitted, title=title)
             img = self._plotData(data-data_fitted, title='fit residual (um) - stdev: %.2E (um)'%np.std(data-data_fitted))
         
-        roc_x = self._roc(popt[3]*1E6*self.scale, self.popt[0])
-        roc_y = self._roc(popt[4]*1E6*self.scale, self.popt[0])
+        roc_x = self._roc(popt[3], self.popt[0])
+        roc_y = self._roc(popt[4], self.popt[0])
         self.radiiOfCurvature = (roc_x, roc_y)
         
         msg1 = 'calculated radii of curvature: %.3f and %.3f um' % self.radiiOfCurvature
         print(msg1)
         logging.info(msg1)
-        
-        msg2 = 'residual standard deviation: %.2E (um)' % np.std(data-data_fitted)
-        print(msg2, '\n\n')
+
+        msg2 = 'calculated dimple diameter: %.3f and %.3f um' % self.dimpleDiameter
+        print(msg2)
         logging.info(msg2)
+        
+        msg3 = 'calculated ellipticity: TBD'
+        print(msg3)
+        logging.info(msg3)
+        
+        msg4 = 'residual standard deviation: %.2E (um)' % np.std(data-data_fitted)
+        print(msg4, '\n\n')
+        logging.info(msg4)
 
         fp = self.filepath
         fn = self.filename[:15].decode() + '_fit_at_' + analysisTime + '.txt'
 
         with open(os.path.join(fp, fn), 'w') as f:
             try:
-                f.write('file: %s\n' % self.filename)
-                f.write('analsis timestamp: %s\n\n' % analysisTime)
+                f.write('Analysing file: %s\n' % self.filename.decode())
+                f.write('Aanalysis timestamp: %s\n\n' % analysisTime)
+                if hasattr(self, 'roi'):
+                    roi = self.roi
+                    f.write('using ROI: (%d,%d,%d,%d) (T,L,H,W)\n' % (roi[0],roi[1],roi[2],roi[3]))
+                else:
+                    f.write('no ROI used\n')
                 f.write('2D Gauss fit params:\n')
                 f.write('%s\n' % (txt % vals))
-                f.write(msg1)
-                f.write(msg2+'\n\n')
+                f.write('\t\t%s\n' % txt2)
+                f.write(msg1 + '\n')
+                f.write(msg2 + '\n')
+                f.write(msg3 + '\n')
+                f.write(msg4 + '\n')
                 logging.info('wrote output to file %s' % os.path.join(fp, fn))
             except Exception as error:
                 logging.error('error during writing to file %s: %s' % (os.path.join(fp, fn), error))
@@ -474,46 +507,15 @@ class fdmsImage():
         D = 2*np.sqrt(2) * sigma
         radius_curvature = D**2 / (8*depth)
         #with D = full width at height of 1/e
-        return radius_curvature
+        return np.abs(radius_curvature)
+    
+    def _diameter(self, sigma):
+        # returns the dimple 1/e diameter
+        return 2*np.sqrt(2) * sigma
     
 if __name__ == '__main__':
-    datadir = 'D:\\FiberDimpleManufacturing\\data\\'
-    # datadir = 'C:\\eschenm\\03_projects\\31_Qutech\\FDMS\\data\\'
-    if 0:
-        filename = datadir + '20170626\\20170626T153130_interferograms.hdf5'
-        roi = (250, 250, 600, 600)
-        useNrOfSteps = 7
-        cosRoi = (200, 200, 10, 10)
-    if 0:
-        filename = datadir + '20170626\\20170626T091302_interferograms.hdf5'
-        roi = (250, 250, 600, 600)
-        useNrOfSteps = 7
-        cosRoi = (200, 200, 10, 10)
-    if 1:
-        filename = datadir + '20170623\\20170623T145259_interferograms.hdf5'
-        roi = (800, 310, 210, 380)
-        cosRoi = (546,  949,  10,  5)
-        useNrOfSteps = 7
-    elif 0:
-        filename  = datadir + '20170620\\20170620T101715_interferograms.hdf5'
-        cosRoi = (546,  949,  10,  5)
-        useNrOfSteps = 5
-    image = fdmsImage(filename)
-    image.analyzeSurface(useNrOfSteps=useNrOfSteps, roi=roi)
-    image.plotInterferograms()
-    image.plotHeight()
-    #image.fitGauss()
+    pass
     
-    if 0:
-        nrSteps = 10
-        periods = np.zeros((nrSteps, nrSteps))
-        for ii in range(nrSteps):
-            for jj in range(nrSteps):
-                roiC = (cosRoi[0]+ii*20, cosRoi[1]+jj*20, cosRoi[2], cosRoi[3])
-                popt = image.fitCosine(roiC)
-                periods[ii, jj] = popt[3]
-        print('mean period: %.3f' % np.mean(periods))
-        
     # Hint from Pep for interrupting and starting ipython console during execution:
     if 0:
         from IPython import embed
