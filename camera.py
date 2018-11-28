@@ -9,13 +9,11 @@ import time
 import PyCapture2
 import numpy as np
 
-if sys.version_info > (3,):
-    class CameraError(Exception):
-        pass
-else:
-    class CameraError(StandardError):
-        pass
 
+class CameraError(Exception):
+    pass
+
+    
 # properties = ['BRIGHTNESS', 'AUTO_EXPOSURE', 'SHARPNESS', 'WHITE_BALANCE', 'HUE', 'SATURATION', 'GAMMA', 'IRIS', 'FOCUS', 'ZOOM', 'PAN', 'TILT', 'SHUTTER', 'GAIN', 'TRIGGER_MODE', 'TRIGGER_DELAY', 'FRAME_RATE', 'TEMPERATURE', 'UNSPECIFIED_PROPERTY_TYPE']
 
 class Camera():
@@ -37,10 +35,7 @@ class Camera():
         time.sleep(0.1)
         self._cameraInfo = self._cam.getCameraInfo()
         if self._cameraInfo.sensorResolution:
-            if sys.version_info > (3,):
-                self._cameraInfo.resolution = [ int(a) for a in self._cameraInfo.sensorResolution.decode().split('x') ]
-            else:
-                self._cameraInfo.resolution = [ int(a) for a in self._cameraInfo.sensorResolution.split('x') ]
+            self._cameraInfo.resolution = [ int(a) for a in self._cameraInfo.sensorResolution.decode().split('x') ]
         for line in str(self._formatStorageClass(self._cameraInfo)).splitlines():
             logging.info(line)
         

@@ -8,13 +8,10 @@ import sys
 import os
 import time
 
-# define error class compatible with python 2.7 and 3.X
-if sys.version_info > (3,):
-    class LoggerError(Exception):
-        pass
-else:
-    class LoggerError(StandardError):
-        pass
+
+class LoggerError(Exception):
+    pass
+
 
 def startLogger(logPath='.', level=logging.NOTSET):
     if not os.path.exists(logPath):

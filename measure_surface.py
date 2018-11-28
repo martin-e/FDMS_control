@@ -10,12 +10,10 @@ import logging, sys, os, time, h5py
 import numpy as np
 import PyCapture2
 
-if sys.version_info > (3,):
-    class MeasureSurfaceError(Exception):
-        pass
-else:
-    class MeasureSurfaceError(StandardError):
-        pass
+
+class MeasureSurfaceError(Exception):
+    pass
+
 
 class Phase_stepping():
     def __init__(self, piezo_ini, phase_stepping_ini, cam, ctrl, datapath):

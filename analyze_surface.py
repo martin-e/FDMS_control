@@ -55,7 +55,7 @@ class fdmsImage():
                 self.pvs        = hdf5File['images'].attrs['pvs']
                 self.numImages  = hdf5File['images'].attrs['numImages']
                 self.numSteps   = hdf5File['images'].attrs['numSteps']
-                self.filename   = hdf5File['images'].attrs['filename']
+                self.filename   = hdf5File['images'].attrs['filename'].decode()
                 self.filepath   = os.path.split(filepath)[0]
                 self.wavelength = getattr(hdf5File['images'], 'wavelength', 635E-9)
         except Exception as error:
@@ -164,10 +164,7 @@ class fdmsImage():
         logging.info('calculating contrast, phase and phase unwrapping done')
 
     def plotInterferograms(self, interpolation="none"):
-        if sys.version_info > (3,):
-            filename = self.filename.decode()
-        else:
-            filename = self.filename
+        filename = self.filename
         try:
             sh = self.averagedImages.shape
         except AttributeError:
@@ -235,10 +232,7 @@ class fdmsImage():
         plt.show(block=False)
 
     def plotAllInterferograms(self, interpolation="none"):
-        if sys.version_info > (3,):
-            filename = self.filename.decode()
-        else:
-            filename = self.filename
+        filename = self.filename
         (nrSteps, nrImages, rows, cols) = np.shape(self.images)
 
         for ii in range(nrSteps):
@@ -261,10 +255,7 @@ class fdmsImage():
         return
 
     def _plotData(self, data, title='', interpolation="none"):
-        if sys.version_info > (3,):
-            filename = self.filename.decode()
-        else:
-            filename = self.filename
+        filename = self.filename
         if not title:
             title = str(filename)
         plot = plt.figure()

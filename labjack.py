@@ -8,12 +8,10 @@ import u3
 import struct
 import sys
 
-if sys.version_info > (3,):
-    class LabJackError(Exception):
-        pass
-else:
-    class LabJackError(StandardError):
-        pass
+
+class LabJackError(Exception):
+    pass
+
 
 def toDouble(buffer):
     """

@@ -86,9 +86,9 @@ nw = time.localtime(time.time())
 filename = ("%04d%02d%02d%02d%02d%02d_calibration.npy" % (nw[0], nw[1], nw[2], nw[3], nw[4], nw[5]))
 
 # %%%%%%%%%%% perform calibration scan
-print ("starting scan!")
+print("starting scan!")
 for i in index:
-    print ("setting %3d/%3d: %.3fV" % (i, voltages[i], len(voltages)))
+    print("setting %3d/%3d: %.3fV" % (i, voltages[i], len(voltages)))
     piezo.setBitval(bitvals[i])
     time.sleep(pausetime)
 	# get image data
@@ -104,6 +104,6 @@ for i in index:
 np.savez_compressed(filename, calData=calData, 
                               voltages=np.array(voltages),
                               bitvals = np.array(bitvals))
-print ("Calibration data save to %s" % filename)
+print("Calibration data save to %s" % filename)
 cam.stopCapture()
 cam.destroyContext()
