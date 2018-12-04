@@ -442,6 +442,7 @@ class fdmsImage():
         self.dimpleDepth = popt[0]
         self.sigma = (popt[3], popt[4])
         self.dimpleDiameter = (self._diameter(popt[3]), self._diameter(popt[4]))
+        self.ellipticity = 1 - np.min((popt[3], popt[4]))/np.max((popt[3], popt[4]))
         
         fp = self.a_path
         if 1:
@@ -449,7 +450,7 @@ class fdmsImage():
             fig = self._plotData(data, title='measured height profile (um)')
             fig.savefig(os.path.join(fp, fn+'_fitHeight.png'))
 
-            title = 'fitted Gauss (with tilt) (um)\ndepth: %.2fum, sigma: (%.3f HOR and %.3f VER)um' % (popt[0], self.sigma[0], self.sigma[1])
+            title = 'fitted Gauss (with tilt) (um)\ndepth: %.2fum, sigma: (%.3f HOR and %.3f VER)um, ellipticity: %.2f%%' % (popt[0], self.sigma[0], self.sigma[1], self.ellipticity*100)
             fig = self._plotData(data_fitted, title=title)
             fig.savefig(os.path.join(fp, fn+'_fitGauss.png'))
 
@@ -477,7 +478,7 @@ class fdmsImage():
         print(msg2)
         logging.info(msg2)
         
-        msg3 = 'calculated ellipticity: TBD'
+        msg3 = 'calculated ellipticity:%.3f' % self.ellipticity
         print(msg3)
         logging.info(msg3)
         
