@@ -389,10 +389,11 @@ class fdmsImage():
         if np.isnan(np.array([d4s_x, d4s_y, xo_px, yo_px])).any():
             sigma_x, sigma_y = 3, 3
             xo, yo = 0, 0
-            logging.debug('could not estimate sigma from height profile, use defaults: %.2E %.2E' % (sigma_x, sigma_y))
+            msg = 'could not estimate sigma from height profile, use defaults: %.2E %.2E' % (sigma_x, sigma_y)
+            logging.debug(msg)
         else:
-            sigma_x = d4s_x * self.scale / 4 * 1E6
-            sigma_y = d4s_y * self.scale / 4 * 1E6
+            sigma_x = d4s_x / 8 * self.scale * 1E6
+            sigma_y = d4s_y / 8 * self.scale * 1E6
             xo = x[0, int(round(xo_px))]
             yo = y[int(round(yo_px)), 0]
             logging.debug('estimated sigma: %.2E %.2E' % (sigma_x, sigma_y))
@@ -457,15 +458,13 @@ class fdmsImage():
             fig = self._plotData(data-data_fitted, title='fit residual (um) - stdev: %.2E (um)'%np.std(data-data_fitted))
             fig.savefig(os.path.join(fp, fn+'_fitResidual.png'))
 
-        if 0:
+        if 1:
             fig = self._plotData(detrended_data, title='tilt removed from data (um)')
             fig.savefig(os.path.join(fp, fn+'_fitTiltRemoved.png'))
 
             fig = self._plotData(initial_guessSurf, title='initial guessed parameters')
             fig.savefig(os.path.join(fp, fn+'_fitInitialGuessedParameters.png'))
 
-
-        
         roc_x = self._roc(popt[3], self.popt[0])
         roc_y = self._roc(popt[4], self.popt[0])
         self.radiiOfCurvature = (roc_x, roc_y)
@@ -478,7 +477,7 @@ class fdmsImage():
         print(msg2)
         logging.info(msg2)
         
-        msg3 = 'calculated ellipticity:%.3f' % self.ellipticity
+        msg3 = 'calculated ellipticity:%.4f' % self.ellipticity
         print(msg3)
         logging.info(msg3)
         

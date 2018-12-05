@@ -8,6 +8,7 @@ def get_d4sigma(array, pix_size):
     
     import numpy as np
     
+    array = array-np.min(array)
     f_y, f_x = array.shape
     
     #(uses 'D4sigma or second moment width' from wikipedia
