@@ -4,6 +4,8 @@
 [fdms]
 MEASURE_SURFACE = True
 SHOOT_DIMPLE = False
+PLOT_SAVE = True
+PLOT_SHOW = True
 
 # options for controlling the reference arm of the interferometer
 [piezo]

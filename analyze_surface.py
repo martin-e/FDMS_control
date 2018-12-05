@@ -33,6 +33,13 @@ class fdmsImage():
         image.analyzeSurface(roi=(410,390, 400, 400), \
             useNrOfSteps=5)
         
+        global variabeles control behavior of plot functions:
+        PLOT_SAVE
+            if initialized and True, plots will be saved to disk. Useful for batch processing
+        PLOT_SHOW
+            if initialized and True, plots will be displayed. Useful for batch processing
+        
+        
         image.plotInterferograms()
         image.plotContrast()
         image.plotPhase()
@@ -40,6 +47,30 @@ class fdmsImage():
         image.plotHeight()
 		image.fitGauss()
         '''
+
+        #define default behavior
+        
+        if 'PLOT_SAVE' in globals():
+            self._plot_save = bool(globals()['PLOT_SAVE'])
+            msg = 'using global setting for saving plots: %s saving' % ['Disabled', 'Enabled'][self._plot_save]
+            print(msg)
+            logging.info(msg)
+        else:
+            self._plot_save = True
+            msg = 'global parameter not found, %s saving figures' % ['disabled', 'enabled'][self._plot_save]
+            print(msg)
+            logging.info(msg)
+
+        if 'PLOT_SHOW' in globals():
+            self._plot_show = bool(globals()['PLOT_SHOW'])
+            msg = 'using global setting for displaying plots: %s displaying' % ['Disabled', 'Enabled'][self._plot_save]
+            print(msg)
+            logging.info(msg)
+        else:
+            self._plot_show = True
+            msg = 'global parameter not found, %s displaying figures' % ['disabled', 'enabled'][self._plot_show]
+            print(msg)
+            logging.info(msg)
         
         msg = ('read contents of file %s' % filename)
         print(msg)
@@ -169,19 +200,25 @@ class fdmsImage():
             wrappedPhase = self.wrappedPhase
         
         # the unwrap_phase function unwraps phase between -pi and pi
-        self.unwrapped_phase = unwrap_phase(wrappedPhase)
-        
-        # subtrace fitted 2d flat surface (detrend)
-        # perform 2d gaussean fit on residual
-        # plot crossection of measurement and fit
-        # calculate ellipticity
-        # look at Tomas's plot
-        
+        self.unwrapped_phase = unwrap_phase(wrappedPhase)        
         self.height = self.unwrapped_phase/(np.pi*2) * self.wavelength/2 * 1e6 * -1
-        self.height -= self.height[0, 0]
-        
+        self.height -= self.height[0, 0]        
         logging.info('calculating contrast, phase and phase unwrapping done')
+        
+        img = self.averagedImages
+        nom = (img[4,...] - img[0,...])
+        denom =  2*(img[3,...] - img[1,...])
+        self.phaseStep = np.arccos(nom/denom)[roi[0]:roi[0]+roi[2], roi[1]:roi[1]+roi[3]]
 
+        idx = np.logical_not(np.isnan(self.phaseStep))
+        phaseMean = np.mean(self.phaseStep[idx].reshape(-1))/np.pi*180
+        phaseStd = np.std(self.phaseStep[idx].reshape(-1))/np.pi*180
+        msg = 'Phase step calibration info:\n\tmean phase step value: %.3f deg\n\tstandard deviation: %.2f deg (using the first 5 steps only!!)' % (phaseMean, phaseStd)
+        print(msg)
+        logging.info(msg)
+        self.phaseMean = phaseMean
+        self.phaseStd = phaseStd
+        
     def plotInterferograms(self, interpolation="none"):
         filename = self.filename
         try:
@@ -220,10 +257,12 @@ class fdmsImage():
 
         ax.text(0.05,0.5, txt, fontsize=11)
         plt.tight_layout()
-        plt.show(block=False)
+        if self._plot_show:
+            plt.show(block=False)
         fp = self.a_path
         fn = self.filename[:15] + '_' + self.a_time + '_interferograms.png'
-        fig.savefig(os.path.join(fp, fn))
+        if self._plot_save:
+            fig.savefig(os.path.join(fp, fn))
         return fig
 
     def plotPhaseStepper(self, ):
@@ -231,28 +270,28 @@ class fdmsImage():
             roi = self.roi
         except AttributeError:
             error('no roi specified, run analyzeSurface')
-        img = self.averagedImages
-        nom = (img[4,...] - img[0,...])
-        denom =  2*(img[3,...] - img[1,...])
-        phaseStep = np.arccos(nom/denom)[roi[0]:roi[0]+roi[2], roi[1]:roi[1]+roi[3]]
+        phaseStep = self.phaseStep
         fig = self._plotData(phaseStep/np.pi*180, title='average phase step (deg)')
-        plt.show(block=False)
+        if self._plot_show:
+            plt.show(block=False)
         fp = self.a_path
         fn = self.filename[:15] + '_' + self.a_time + '_averagePhaseStep.png'
-        fig.savefig(os.path.join(fp, fn))
+        if self._plot_save:
+            fig.savefig(os.path.join(fp, fn))
 
         idx = np.logical_not(np.isnan(phaseStep))
-        phaseMean = np.mean(phaseStep[idx].reshape(-1))/np.pi*180
-        phaseStd = np.std(phaseStep[idx].reshape(-1))/np.pi*180
-        print('Phase step calibration info:\n\tmean phase step value: %.3f deg\n\tstandard deviation: %.2f deg' % (phaseMean, phaseStd))
+        phaseMean = self.phaseMean
+        phaseStd = self.phaseStd
         fig = plt.figure()
         plt.hist(phaseStep[idx].reshape(-1)/np.pi*180, 100)
         plt.xlabel('phase step (deg)')
         plt.ylabel('nr. (-)')
         plt.title('phase step mean: %.3f deg std:  %.3f deg' % (phaseMean, phaseStd))
-        plt.show(block=False)
+        if self._plot_show:
+            plt.show(block=False)
         fn = self.filename[:15] + '_' + self.a_time + '_phaseHistogram.png'
-        fig.savefig(os.path.join(fp, fn))
+        if self._plot_save:
+            fig.savefig(os.path.join(fp, fn))
 
 
     def plotAllInterferograms(self, interpolation="none"):
@@ -278,8 +317,10 @@ class fdmsImage():
         fp = self.a_path
         fn = self.filename[:15] + '_' + self.a_time + '_allInterferograms.png'
         plt.tight_layout()
-        fig.savefig(os.path.join(fp, fn))
-        plt.show(block=False)
+        if self._plot_save:
+            fig.savefig(os.path.join(fp, fn))
+        if self._plot_show:
+            plt.show(block=False)
         return fig
 
     def _plotData(self, data, title='', interpolation="none", applyScaling=True):
@@ -298,13 +339,14 @@ class fdmsImage():
             extent.append(extentY[0])
             extent.append(extentY[1])
             plt.imshow(data, interpolation=interpolation, extent=extent, aspect='auto')
+            plt.xlabel('position (um)')
+            plt.ylabel('position (um)')
         else:
             plt.imshow(data, interpolation=interpolation, aspect='auto')
-        plt.xlabel('position (um)')
-        plt.ylabel('position (um)')
         plt.colorbar()
         plt.title(title)
-        plt.show(block=False)
+        if self._plot_show:
+            plt.show(block=False)
         return plot
         
     def plotContrast(self):
@@ -313,28 +355,37 @@ class fdmsImage():
         fig = self._plotData(contrastData, title='fringe contrast', applyScaling=False)
         fp = self.a_path
         fn = self.filename[:15] + '_' + self.a_time + '_contrast.png'
-        fig.savefig(os.path.join(fp, fn))
-        return fig        
+        if self._plot_save:
+            fig.savefig(os.path.join(fp, fn))
+        return fig
         
     def plotPhase(self):
-        fig = self._plotData(self.wrappedPhase, title='wrapped phase (rad)')
+        fig = self._plotData(self.wrappedPhase, title='wrapped phase (rad)', applyScaling=False)
         fp = self.a_path
         fn = self.filename[:15] + '_' + self.a_time + '_wrappedPhase.png'
-        fig.savefig(os.path.join(fp, fn))
+        if self._plot_save:
+            fig.savefig(os.path.join(fp, fn))
         return fig
         
     def plotUnwrappedPhase(self):
         fig = self._plotData(self.unwrapped_phase, title='unwrapped phase (rad)')
         fp = self.a_path
         fn = self.filename[:15] + '_' + self.a_time + '_unwrappedPhase.png'
-        fig.savefig(os.path.join(fp, fn))
+        if self._plot_save:
+            fig.savefig(os.path.join(fp, fn))
         return fig
     
     def plotHeight(self):
-        fig = self._plotData(self.height-self.height[1,1], title='height (um)')
+        data = self.height
+        bs = int(data.shape[0]/10)
+        corners = [np.mean(data[:bs,:bs]), np.mean(data[:bs,-bs:]), np.mean(data[-bs:,:bs]), np.mean(data[-bs:,-bs:])]
+        offset = np.mean(corners)
+
+        fig = self._plotData(self.height-offset, title='height (um)')
         fp = self.a_path
         fn = self.filename[:15] + '_' + self.a_time + '_height.png'
-        fig.savefig(os.path.join(fp, fn))
+        if self._plot_save:
+            fig.savefig(os.path.join(fp, fn))
         return fig
 
     def fitGauss(self, data=np.array([]), scale=0.1172E-6):
@@ -418,8 +469,6 @@ class fdmsImage():
         data_fitted = twoD_GaussianWithTilt((x, y, self.scale), *popt).reshape(shape)
         self.data_fitted = data_fitted
         self.popt = popt
-        from IPython import embed
-        embed()
         
         txt = '\t\tamplitude: %.3fum\n\t\t(x0, y0): (%.2f, %.2f) um\n\t\t(sigma_x, sigma_y): (%.4f, %.4f) um\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f um\n\t\tbackground tilt (x, y): (%.3E, %.3E) (mrad)'
         theta_deg = np.mod(popt[5]/np.pi*180, 180)
@@ -454,25 +503,42 @@ class fdmsImage():
         self.radiiOfCurvature = (roc_x, roc_y)
         
         fp = self.a_path
+        fn = self.filename[:15] + '_' + self.a_time
         if 1:
-            fn = self.filename[:15] + '_' + self.a_time
-            fig = self._plotData(data, title='measured height profile (um)')
-            fig.savefig(os.path.join(fp, fn+'_fitHeight.png'))
-
+            # contourplot
             title = 'fitted Gauss (with tilt) (um)\ndepth: %.2fum, sigma: (x=%.2f, y=%.2f)um\nRoC: (x=%.2f, y=%.2f)um, ellipticity: %.2f%%' % (popt[0], self.sigma[0], self.sigma[1], roc_x, roc_y, self.ellipticity*100)
-            fig = self._plotData(data_fitted, title=title)
-            fig.savefig(os.path.join(fp, fn+'_fitGauss.png'))
-
+            fig = self._plotData(data, title=title)
+            ax = plt.gca()
+            ax.hold(True)
+            ax.contour(x, y, data_fitted[::-1,:], 8, colors='w')
+            #if self._plot_show:
+            #    plt.show(block=False)
+            if self._plot_save:
+                fig.savefig(os.path.join(fp, fn+'_fitGaussContour.png'))
+        
             fig = self._plotData(data-data_fitted, title='fit residual (um) - stdev: %.2E (um)'%np.std(data-data_fitted))
-            fig.savefig(os.path.join(fp, fn+'_fitResidual.png'))
+            if self._plot_save:
+                fig.savefig(os.path.join(fp, fn+'_fitResidual.png'))
 
+        # fit debugging plots
         if 0:
+            fig = self._plotData(data, title='measured height profile (um)')
+            if self._plot_save:
+                fig.savefig(os.path.join(fp, fn+'_fitHeight.png'))
+
             fig = self._plotData(detrended_data, title='tilt removed from data (um)')
-            fig.savefig(os.path.join(fp, fn+'_fitTiltRemoved.png'))
+            if self._plot_save:
+                fig.savefig(os.path.join(fp, fn+'_fitTiltRemoved.png'))
 
             fig = self._plotData(initial_guessSurf, title='initial guessed parameters')
-            fig.savefig(os.path.join(fp, fn+'_fitInitialGuessedParameters.png'))
+            if self._plot_save:
+                fig.savefig(os.path.join(fp, fn+'_fitInitialGuessedParameters.png'))
         
+            title = 'fitted Gauss (with tilt) (um)\ndepth: %.2fum, sigma: (x=%.2f, y=%.2f)um\nRoC: (x=%.2f, y=%.2f)um, ellipticity: %.2f%%' % (popt[0], self.sigma[0], self.sigma[1], roc_x, roc_y, self.ellipticity*100)
+            fig = self._plotData(data_fitted, title=title)
+            if self._plot_save:
+                fig.savefig(os.path.join(fp, fn+'_fitGauss.png'))
+
         msg1 = 'calculated radii of curvature: %.3f and %.3f um' % self.radiiOfCurvature
         print(msg1)
         logging.info(msg1)
@@ -486,8 +552,12 @@ class fdmsImage():
         logging.info(msg3)
         
         msg4 = 'residual standard deviation: %.2E (um)' % np.std(data-data_fitted)
-        print(msg4, '\n\n')
+        print(msg4)
         logging.info(msg4)
+
+        msg5 = 'average phase step: %.3f deg, stdev: %.3f deg(based on first 5 interferograms only!)' % (self.phaseMean, self.phaseStd)
+        print(msg5, '\n\n')
+        logging.info(msg5)
 
         fp = self.a_path
         fn = self.filename[:15] + '_fit_at_' + self.a_time + '.txt'
@@ -508,11 +578,26 @@ class fdmsImage():
                 f.write(msg2 + '\n')
                 f.write(msg3 + '\n')
                 f.write(msg4 + '\n')
+                f.write(msg5 + '\n')
                 logging.info('wrote output to file %s' % os.path.join(fp, fn))
             except Exception as error:
                 logging.error('error during writing to file %s: %s' % (os.path.join(fp, fn), error))
                 raise Exception(error)
-                
+ 
+        # write output in .csv file
+        fn = self.filename[:15] + '_' + self.a_time + '_results.csv'
+        with open(os.path.join(fp, fn), 'w') as f:
+            f.write('File:,%s,analysis_time:,%s\n' % (self.filename, analysisTime))
+            txt1 = '%.3E,%.2f,%.2f,%.3E,%.3E,%.2f,%.3f,%.3E,%.3E,'
+            txt2 = '%d,%d,%d,%d,%.3f,%.3f,%.3E,%.3f,%.3f,%.5f\n'
+            vals1 = (popt[0],self.x_detector,self.y_detector,popt[3],popt[4],theta_deg,popt[6],popt[7],popt[8])
+            vals2 = (roi[0],roi[1],roi[2],roi[3],roc_x,roc_y,self.ellipticity,self.phaseMean,self.phaseStd,np.std(data-data_fitted))
+            f.write(txt1 % vals1)
+            f.write(txt2 % vals2)
+            f.write('depth,centroid_left,centroid_top,sigma_x,sigma_y,theta,offset,tiltX,tiltY,roi_T,roi_L,roi_H,roi_W,RoC_x,RoC_y,ellipticity,meanPhaseStep,stdevPhaseStep,residual_stdev\n')
+            f.write('um,pix,pix,um,um,deg,um,mrad,mrad,pix,pix,pix,pix,um,um,-,deg,deg,um\n')            
+
+    
     def fitCosine(self, roi, plotfit=False):
         '''roi in (X, Y, W, H)
         returns amplitude and phase'''
@@ -546,7 +631,8 @@ class fdmsImage():
             txt = 'amplitude: %.3f phase: %.3f° offset: %.3f period: %.3f * 2PI' % (popt[0],  popt[1]*180/np.pi,  popt[2],  popt[3])
             ax=plt.gca()
             ax.text(0.05,0.85, txt, fontsize=11)
-            plt.show()
+            if self._plot_show:
+                plt.show(block=False)
             plt.grid(True)
         return popt
 
