@@ -259,7 +259,7 @@ class fdmsImage():
         filename = self.filename
         (nrSteps, nrImages, rows, cols) = np.shape(self.images)
 
-        fig, ax = plt.subplots(figsize=(nrSteps*4, nrImages*3))
+        fig, ax = plt.subplots(figsize=(nrImages*4, nrSteps*3))
         for ii in range(nrSteps):
             for jj in range(nrImages):
                 nrPlot = ii*nrImages + jj
@@ -282,21 +282,24 @@ class fdmsImage():
         plt.show(block=False)
         return fig
 
-    def _plotData(self, data, title='', interpolation="none"):
+    def _plotData(self, data, title='', interpolation="none", applyScaling=True):
         filename = self.filename
         if not title:
             title = str(filename)
         plot = plt.figure()
         shape = np.shape(data)
-
-        extentX = self.scale*1e6 * np.array((0., shape[1]))
-        extentX -= np.mean(extentX)
-        extentY = self.scale*1e6 * np.array((0., shape[0]))
-        extentY -= np.mean(extentY)
-        extent = list(extentX)
-        extent.append(extentY[0])
-        extent.append(extentY[1])
-        plt.imshow(data, interpolation=interpolation, extent=extent, aspect='auto')
+        
+        if applyScaling:
+            extentX = self.scale*1e6 * np.array((0., shape[1]))
+            extentX -= np.mean(extentX)
+            extentY = self.scale*1e6 * np.array((0., shape[0]))
+            extentY -= np.mean(extentY)
+            extent = list(extentX)
+            extent.append(extentY[0])
+            extent.append(extentY[1])
+            plt.imshow(data, interpolation=interpolation, extent=extent, aspect='auto')
+        else:
+            plt.imshow(data, interpolation=interpolation, aspect='auto')
         plt.xlabel('position (um)')
         plt.ylabel('position (um)')
         plt.colorbar()
@@ -307,7 +310,7 @@ class fdmsImage():
     def plotContrast(self):
         contrastData = self.contrast
         contrastData[contrastData > 1] = 1
-        fig = self._plotData(contrastData, title='fringe contrast')
+        fig = self._plotData(contrastData, title='fringe contrast', applyScaling=False)
         fp = self.a_path
         fn = self.filename[:15] + '_' + self.a_time + '_contrast.png'
         fig.savefig(os.path.join(fp, fn))
@@ -444,6 +447,9 @@ class fdmsImage():
         self.sigma = (popt[3], popt[4])
         self.dimpleDiameter = (self._diameter(popt[3]), self._diameter(popt[4]))
         self.ellipticity = 1 - np.min((popt[3], popt[4]))/np.max((popt[3], popt[4]))
+        roc_x = self._roc(popt[3], self.popt[0])
+        roc_y = self._roc(popt[4], self.popt[0])
+        self.radiiOfCurvature = (roc_x, roc_y)
         
         fp = self.a_path
         if 1:
@@ -451,23 +457,19 @@ class fdmsImage():
             fig = self._plotData(data, title='measured height profile (um)')
             fig.savefig(os.path.join(fp, fn+'_fitHeight.png'))
 
-            title = 'fitted Gauss (with tilt) (um)\ndepth: %.2fum, sigma: (%.3f HOR and %.3f VER)um, ellipticity: %.2f%%' % (popt[0], self.sigma[0], self.sigma[1], self.ellipticity*100)
+            title = 'fitted Gauss (with tilt) (um)\ndepth: %.2fum, sigma: (x=%.2f, y=%.2f)um\nRoC: (x=%.2f, y=%.2f)um, ellipticity: %.2f%%' % (popt[0], self.sigma[0], self.sigma[1], roc_x, roc_y, self.ellipticity*100)
             fig = self._plotData(data_fitted, title=title)
             fig.savefig(os.path.join(fp, fn+'_fitGauss.png'))
 
             fig = self._plotData(data-data_fitted, title='fit residual (um) - stdev: %.2E (um)'%np.std(data-data_fitted))
             fig.savefig(os.path.join(fp, fn+'_fitResidual.png'))
 
-        if 1:
+        if 0:
             fig = self._plotData(detrended_data, title='tilt removed from data (um)')
             fig.savefig(os.path.join(fp, fn+'_fitTiltRemoved.png'))
 
             fig = self._plotData(initial_guessSurf, title='initial guessed parameters')
             fig.savefig(os.path.join(fp, fn+'_fitInitialGuessedParameters.png'))
-
-        roc_x = self._roc(popt[3], self.popt[0])
-        roc_y = self._roc(popt[4], self.popt[0])
-        self.radiiOfCurvature = (roc_x, roc_y)
         
         msg1 = 'calculated radii of curvature: %.3f and %.3f um' % self.radiiOfCurvature
         print(msg1)
