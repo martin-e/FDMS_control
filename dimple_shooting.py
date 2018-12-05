@@ -27,7 +27,7 @@ class DimpleShooting():
             logging.warning('powermeter is not yet configured')
 
     def prepareShot(self, **kwargs):
-        '''prepareShot(width=1E-6, height=7.5, nr_pulses=1, period=5E-6)
+        '''prepareShot(width=150E-6, height=5.0, nr_pulses=10, period=1E-3)
         
         by default the values stored in the dimple_shooting section of fdms.ini are used
         width:      [float] pulse width in s
