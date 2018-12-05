@@ -15,12 +15,19 @@ import scipy.optimize as opt
 from skimage.restoration import unwrap_phase
 from twoD_Gaussian import twoD_GaussianWithTilt
 from d4s import get_d4sigma
-# from scipy.ndimage.measurements import center_of_mass
+
 
 class fdmsImage():
-    def __init__(self, filename):
+    def __init__(self, filename, a_path=''):
         '''
         Opens and reads hdf5 file stored by FDMS control software
+        
+        parameters:
+            filename    path to hdf5 file
+            a_path      path to directory with analysis results stored in a
+                            daily directory structure similar to how the measurement
+                            data is organized. If omitted, it stores all output in
+                            the same directory as the hdf5 file.
 
         image = fdmsImage(pathToHdf5File)
         image.analyzeSurface(roi=(410,390, 400, 400), \
@@ -42,10 +49,22 @@ class fdmsImage():
         else:
             logging.error('could not find file %s' % filename)
             raise Exception('could not find file %s' % filename)
-
+        if a_path:
+            if not os.path.isdir(a_path):
+                msg = 'could not find path to analysis results directory: %s' % a_path
+                logging.error(msg)
+                raise Exception(msg)
+            a_path += os.path.basename(filename)[:8]
+            if not os.path.isdir(a_path):
+                os.mkdir(a_path)
+                print('created new directory for analysis results: %s' % a_path)
+        else:
+            a_path = os.path.dirname(filename)
+        self.a_path = a_path
+        self.a_time = time.strftime('%Y%m%dT%H%M%S')
         
         try:
-            with h5py.File(filepath,  "r") as hdf5File:
+            with h5py.File(filepath, "r") as hdf5File:
                 logging.debug('file opened for reading')
                 # read contents of hdf5 file
                 
@@ -55,7 +74,7 @@ class fdmsImage():
                 self.pvs        = hdf5File['images'].attrs['pvs']
                 self.numImages  = hdf5File['images'].attrs['numImages']
                 self.numSteps   = hdf5File['images'].attrs['numSteps']
-                self.filename   = hdf5File['images'].attrs['filename']
+                self.filename   = hdf5File['images'].attrs['filename'].decode()
                 self.filepath   = os.path.split(filepath)[0]
                 self.wavelength = getattr(hdf5File['images'], 'wavelength', 635E-9)
         except Exception as error:
@@ -164,10 +183,7 @@ class fdmsImage():
         logging.info('calculating contrast, phase and phase unwrapping done')
 
     def plotInterferograms(self, interpolation="none"):
-        if sys.version_info > (3,):
-            filename = self.filename.decode()
-        else:
-            filename = self.filename
+        filename = self.filename
         try:
             sh = self.averagedImages.shape
         except AttributeError:
@@ -175,11 +191,8 @@ class fdmsImage():
             print(msg)
             logging.error(msg)
             return
-        fig = plt.figure()
-        if self.numSteps == 5:
-            layout = (2, 3)
-        else:
-            layout = (2, 4)
+        fig, ax = plt.subplots(figsize=(24, 8))
+        layout = (2, 4)
         for ii in range(self.numSteps):
             plt.subplot(*layout, ii+1)
             ax = plt.gca()
@@ -196,10 +209,7 @@ class fdmsImage():
             plt.title(title)
             # gca().add_patch(patches.Rectangle( (100, 200),300,400,
             #                    fill=False, linestyle='dashed'))
-        if self.numSteps == 5:
-            ax = plt.subplot(236)
-        else:
-            ax = plt.subplot(248)
+        ax = plt.subplot(248)
         ax.axis('off')
         
         if hasattr(self, 'roi'):
@@ -209,8 +219,12 @@ class fdmsImage():
         txt = '%s\n%s\nusing %d images' % (str(filename), roitxt, self.numStepAnalysis)
 
         ax.text(0.05,0.5, txt, fontsize=11)
+        plt.tight_layout()
         plt.show(block=False)
-        return plt.gcf()
+        fp = self.a_path
+        fn = self.filename[:15] + '_' + self.a_time + '_interferograms.png'
+        fig.savefig(os.path.join(fp, fn))
+        return fig
 
     def plotPhaseStepper(self, ):
         try:
@@ -221,8 +235,12 @@ class fdmsImage():
         nom = (img[4,...] - img[0,...])
         denom =  2*(img[3,...] - img[1,...])
         phaseStep = np.arccos(nom/denom)[roi[0]:roi[0]+roi[2], roi[1]:roi[1]+roi[3]]
-        self._plotData(phaseStep/np.pi*180, title='average phase step (deg)')
+        fig = self._plotData(phaseStep/np.pi*180, title='average phase step (deg)')
         plt.show(block=False)
+        fp = self.a_path
+        fn = self.filename[:15] + '_' + self.a_time + '_averagePhaseStep.png'
+        fig.savefig(os.path.join(fp, fn))
+
         idx = np.logical_not(np.isnan(phaseStep))
         phaseMean = np.mean(phaseStep[idx].reshape(-1))/np.pi*180
         phaseStd = np.std(phaseStep[idx].reshape(-1))/np.pi*180
@@ -233,14 +251,15 @@ class fdmsImage():
         plt.ylabel('nr. (-)')
         plt.title('phase step mean: %.3f deg std:  %.3f deg' % (phaseMean, phaseStd))
         plt.show(block=False)
+        fn = self.filename[:15] + '_' + self.a_time + '_phaseHistogram.png'
+        fig.savefig(os.path.join(fp, fn))
+
 
     def plotAllInterferograms(self, interpolation="none"):
-        if sys.version_info > (3,):
-            filename = self.filename.decode()
-        else:
-            filename = self.filename
+        filename = self.filename
         (nrSteps, nrImages, rows, cols) = np.shape(self.images)
 
+        fig, ax = plt.subplots(figsize=(nrSteps*4, nrImages*3))
         for ii in range(nrSteps):
             for jj in range(nrImages):
                 nrPlot = ii*nrImages + jj
@@ -256,15 +275,15 @@ class fdmsImage():
                     ax.add_patch(rect)
                 title = ('step: %d image: %d' % (ii, jj))
                 plt.title(title)
+        fp = self.a_path
+        fn = self.filename[:15] + '_' + self.a_time + '_allInterferograms.png'
+        plt.tight_layout()
+        fig.savefig(os.path.join(fp, fn))
         plt.show(block=False)
-        # return plt.gcf()
-        return
+        return fig
 
     def _plotData(self, data, title='', interpolation="none"):
-        if sys.version_info > (3,):
-            filename = self.filename.decode()
-        else:
-            filename = self.filename
+        filename = self.filename
         if not title:
             title = str(filename)
         plot = plt.figure()
@@ -274,9 +293,9 @@ class fdmsImage():
         extentX -= np.mean(extentX)
         extentY = self.scale*1e6 * np.array((0., shape[0]))
         extentY -= np.mean(extentY)
-        extent = list(extentY)
-        extent.append(extentX[0])
-        extent.append(extentX[1])
+        extent = list(extentX)
+        extent.append(extentY[0])
+        extent.append(extentY[1])
         plt.imshow(data, interpolation=interpolation, extent=extent, aspect='auto')
         plt.xlabel('position (um)')
         plt.ylabel('position (um)')
@@ -288,16 +307,32 @@ class fdmsImage():
     def plotContrast(self):
         contrastData = self.contrast
         contrastData[contrastData > 1] = 1
-        self._plotData(contrastData, title='fringe contrast')
+        fig = self._plotData(contrastData, title='fringe contrast')
+        fp = self.a_path
+        fn = self.filename[:15] + '_' + self.a_time + '_contrast.png'
+        fig.savefig(os.path.join(fp, fn))
+        return fig        
         
     def plotPhase(self):
-        return self._plotData(self.wrappedPhase, title='wrapped phase (rad)')
+        fig = self._plotData(self.wrappedPhase, title='wrapped phase (rad)')
+        fp = self.a_path
+        fn = self.filename[:15] + '_' + self.a_time + '_wrappedPhase.png'
+        fig.savefig(os.path.join(fp, fn))
+        return fig
         
     def plotUnwrappedPhase(self):
-        return self._plotData(self.unwrapped_phase, title='unwrapped phase (rad)')
+        fig = self._plotData(self.unwrapped_phase, title='unwrapped phase (rad)')
+        fp = self.a_path
+        fn = self.filename[:15] + '_' + self.a_time + '_unwrappedPhase.png'
+        fig.savefig(os.path.join(fp, fn))
+        return fig
     
     def plotHeight(self):
-        return self._plotData(self.height-self.height[1,1], title='height (um)')
+        fig = self._plotData(self.height-self.height[1,1], title='height (um)')
+        fp = self.a_path
+        fn = self.filename[:15] + '_' + self.a_time + '_height.png'
+        fig.savefig(os.path.join(fp, fn))
+        return fig
 
     def fitGauss(self, data=np.array([]), scale=0.1172E-6):
         '''fits a 2D Gauss to a calculated height
@@ -308,7 +343,7 @@ class fdmsImage():
                 5.86 um detector pixels
         '''
         
-        analysisTime = time.strftime('%Y%m%dT%H%M%S')
+        analysisTime = self.a_time
         if not data.any():
             try:
                 data = self.height
@@ -369,7 +404,7 @@ class fdmsImage():
         txt = 'initial_guess: amplitude: %.3fum\n\t\t(x0, y0): (%.1f, %.1f) um\n\t\t(sigma_x, sigma_y): (%.2f, %.2f) um\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f um\n\t\tbackground tilt (x, y): (%.3E, %.3E) (mrad)'
         theta_deg = ig[5]/np.pi*180
         vals = (ig[0], ig[1], ig[2], ig[3], ig[4], theta_deg, ig[6], ig[7], ig[8])
-        print(txt % vals)
+        # print(txt % vals)
         logging.debug('starting 2d Gauss fit with these initial parameters:')
         for line in (txt % vals).splitlines():
             logging.info(line)
@@ -407,14 +442,29 @@ class fdmsImage():
         self.dimpleDepth = popt[0]
         self.sigma = (popt[3], popt[4])
         self.dimpleDiameter = (self._diameter(popt[3]), self._diameter(popt[4]))
+        self.ellipticity = 1 - np.min((popt[3], popt[4]))/np.max((popt[3], popt[4]))
         
+        fp = self.a_path
         if 1:
-            img = self._plotData(data, title='measured height profile (um)')
-            img = self._plotData(detrended_data, title='tilt removed from data (um)')
-            img = self._plotData(initial_guessSurf, title='initial guessed parameters')
-            title = 'fitted Gauss (with tilt) (um)\ndepth: %.2fum, sigma: (%.3f HOR and %.3f VER)um' % (popt[0], self.sigma[0], self.sigma[1])
-            img = self._plotData(data_fitted, title=title)
-            img = self._plotData(data-data_fitted, title='fit residual (um) - stdev: %.2E (um)'%np.std(data-data_fitted))
+            fn = self.filename[:15] + '_' + self.a_time
+            fig = self._plotData(data, title='measured height profile (um)')
+            fig.savefig(os.path.join(fp, fn+'_fitHeight.png'))
+
+            title = 'fitted Gauss (with tilt) (um)\ndepth: %.2fum, sigma: (%.3f HOR and %.3f VER)um, ellipticity: %.2f%%' % (popt[0], self.sigma[0], self.sigma[1], self.ellipticity*100)
+            fig = self._plotData(data_fitted, title=title)
+            fig.savefig(os.path.join(fp, fn+'_fitGauss.png'))
+
+            fig = self._plotData(data-data_fitted, title='fit residual (um) - stdev: %.2E (um)'%np.std(data-data_fitted))
+            fig.savefig(os.path.join(fp, fn+'_fitResidual.png'))
+
+        if 0:
+            fig = self._plotData(detrended_data, title='tilt removed from data (um)')
+            fig.savefig(os.path.join(fp, fn+'_fitTiltRemoved.png'))
+
+            fig = self._plotData(initial_guessSurf, title='initial guessed parameters')
+            fig.savefig(os.path.join(fp, fn+'_fitInitialGuessedParameters.png'))
+
+
         
         roc_x = self._roc(popt[3], self.popt[0])
         roc_y = self._roc(popt[4], self.popt[0])
@@ -428,7 +478,7 @@ class fdmsImage():
         print(msg2)
         logging.info(msg2)
         
-        msg3 = 'calculated ellipticity: TBD'
+        msg3 = 'calculated ellipticity:%.3f' % self.ellipticity
         print(msg3)
         logging.info(msg3)
         
@@ -436,12 +486,12 @@ class fdmsImage():
         print(msg4, '\n\n')
         logging.info(msg4)
 
-        fp = self.filepath
-        fn = self.filename[:15].decode() + '_fit_at_' + analysisTime + '.txt'
+        fp = self.a_path
+        fn = self.filename[:15] + '_fit_at_' + self.a_time + '.txt'
 
         with open(os.path.join(fp, fn), 'w') as f:
             try:
-                f.write('Analysing file: %s\n' % self.filename.decode())
+                f.write('Analysing file: %s\n' % self.filename)
                 f.write('Aanalysis timestamp: %s\n\n' % analysisTime)
                 if hasattr(self, 'roi'):
                     roi = self.roi

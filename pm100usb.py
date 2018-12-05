@@ -9,12 +9,10 @@ import sys
 import time
 import logging
 
-if sys.version_info > (3,):
-    class PowermeterError(Exception):
-        pass
-else:
-    class PowermeterError(StandardError):
-        pass
+
+class PowermeterError(Exception):
+    pass
+
 
 log = logging.getLogger('pm100usb')
 logging.getLogger('pyvisa').setLevel(logging.WARNING)

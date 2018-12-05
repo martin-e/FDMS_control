@@ -19,12 +19,10 @@ import struct
 import time
 import logging
 
-if sys.version_info > (3,):
-    class AwgError(Exception):
-        pass
-else:
-    class AwgError(StandardError):
-        pass
+
+class AwgError(Exception):
+    pass
+
 
 log = logging.getLogger('SDG2000')
 logging.getLogger('pyvisa').setLevel(logging.WARNING)

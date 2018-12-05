@@ -252,4 +252,4 @@ if __name__ == '__main__':
         print("enter    ctrl.terminate()   to halt")
         
     except:
-        print ("could not start pid loop")
+        print("could not start pid loop")

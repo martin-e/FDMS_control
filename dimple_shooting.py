@@ -6,12 +6,10 @@
 import logging
 import sys
 
-if sys.version_info > (3,):
-    class DimpleShootingError(Exception):
-        pass
-else:
-    class DimpleShootingError(StandardError):
-        pass
+
+class DimpleShootingError(Exception):
+    pass
+
 
 class DimpleShooting():
     def __init__(self, powermeter_ini, awg_ini, dimple_shooting_ini, powermeter, awg):

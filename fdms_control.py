@@ -16,12 +16,10 @@ import fdms_utils as utils
 import iniparser
 import analyze_surface
 
-if sys.version_info > (3,):
-    class FdmsError(Exception):
-        pass
-else:
-    class FdmsError(StandardError):
-        pass
+
+class FdmsError(Exception):
+    pass
+
 
 INIFILE = 'fdms.ini'
 LOGLEVEL = logging.DEBUG
