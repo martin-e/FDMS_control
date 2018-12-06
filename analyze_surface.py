@@ -502,6 +502,7 @@ class fdmsImage():
         roc_x = self._roc(popt[3], self.popt[0])
         roc_y = self._roc(popt[4], self.popt[0])
         self.radiiOfCurvature = (roc_x, roc_y)
+        self.residualStdevGauss = np.std(data-data_fitted)
         
         fp = self.a_path
         fn = self.filename[:15] + '_' + self.a_time
@@ -517,7 +518,7 @@ class fdmsImage():
             if self._plot_save:
                 fig.savefig(os.path.join(fp, fn+'_fitGaussContour.png'))
         
-            fig = self._plotData(data-data_fitted, title='fit residual (um) - stdev: %.2E (um)'%np.std(data-data_fitted))
+            fig = self._plotData(data-data_fitted, title='fit residual (um) - stdev: %.2E (um)'%self.residualStdevGauss)
             if self._plot_save:
                 fig.savefig(os.path.join(fp, fn+'_fitResidual.png'))
 
@@ -553,34 +554,50 @@ class fdmsImage():
         errfunc = lambda p, x: self._sphere(p, x) - p[3]        
         p1, flag = leastsq(errfunc, p0, args=(coords,))
         self.roc_sphere = p1[3]
-        sphere = np.nan*np.zeros(x.shape)
-        sphere[idx] = self._sphereSurf(p1, coords[:,:2])
+        sphereFit = np.nan*np.zeros(x.shape)
+        sphereFit[idx] = self._sphereSurf(p1, coords[:,:2])
+        # fit debugging plots
+
         if 1:
             title = 'fit sphere (um)  -  RoC = %.3f' % self.roc_sphere
-            fig = self._plotData(sphere, title=title)
+            fig = self._plotData(sphereFit, title=title)
             if self._plot_save:
                 fig.savefig(os.path.join(fp, fn+'_fitSphere.png'))
+            self.residual = np.nan*np.zeros(x.shape)
+            self.residual[idx] = data[idx] - sphereFit[idx]
+            self.residualStdevSphere = np.std(self.residual[idx])
+            title = 'residual of spherical fit (um)  -  stdev: %.3E' % self.residualStdevSphere
+            fig = self._plotData(self.residual, title=title)
+            if self._plot_save:
+                fig.savefig(os.path.join(fp, fn+'_fitSphereResidual.png'))
 
-        
         msg1 = 'calculated radii of curvature: %.3f and %.3f um' % self.radiiOfCurvature
         print(msg1)
         logging.info(msg1)
 
-        msg2 = 'calculated dimple diameter: %.3f and %.3f um' % self.dimpleDiameter
+        msg2 = 'calculated radius of curvature from spherical fit of 1/e diameter: %.3f' % self.roc_sphere
         print(msg2)
         logging.info(msg2)
         
-        msg3 = 'calculated ellipticity:%.4f' % self.ellipticity
+        msg3 = 'calculated dimple diameter: %.3f and %.3f um' % self.dimpleDiameter
         print(msg3)
         logging.info(msg3)
         
-        msg4 = 'residual standard deviation: %.2E (um)' % np.std(data-data_fitted)
+        msg4 = 'calculated ellipticity:%.4f' % self.ellipticity
         print(msg4)
         logging.info(msg4)
-
-        msg5 = 'average phase step: %.3f deg, stdev: %.3f deg(based on first 5 interferograms only!)' % (self.phaseMean, self.phaseStd)
-        print(msg5, '\n\n')
+        
+        msg5 = 'gauss fit residual standard deviation: %.2E (um)' % self.residualStdevGauss
+        print(msg5)
         logging.info(msg5)
+
+        msg6 = 'sphere fit residual standard deviation: %.2E (um)' % self.residualStdevSphere
+        print(msg6)
+        logging.info(msg6)
+
+        msg7 = 'average phase step: %.3f deg, stdev: %.3f deg(based on first 5 interferograms only!)' % (self.phaseMean, self.phaseStd)
+        print(msg7, '\n\n')
+        logging.info(msg7)
 
         fp = self.a_path
         fn = self.filename[:15] + '_fit_at_' + self.a_time + '.txt'
@@ -602,6 +619,8 @@ class fdmsImage():
                 f.write(msg3 + '\n')
                 f.write(msg4 + '\n')
                 f.write(msg5 + '\n')
+                f.write(msg6 + '\n')
+                f.write(msg7 + '\n')
                 logging.info('wrote output to file %s' % os.path.join(fp, fn))
         except Exception as error:
             logging.error('error during writing to file %s: %s' % (os.path.join(fp, fn), error))
@@ -612,13 +631,13 @@ class fdmsImage():
         try:
             with open(os.path.join(fp, fn), 'w') as f:
                 txt1 = '%s,%.3E,%.2f,%.2f,%.3E,%.3E,%.2f,%.3f,%.3E,%.3E,'
-                txt2 = '%d,%d,%d,%d,%.3f,%.3f,%.3f,%.3E,%.3f,%.3f,%.5f\n'
+                txt2 = '%d,%d,%d,%d,%.3f,%.3f,%.3f,%.3E,%.3f,%.3f,%.5f,%.3f\n'
                 vals1 = (self.filename,popt[0],self.x_detector,self.y_detector,popt[3],popt[4],theta_deg,popt[6],popt[7],popt[8])
-                vals2 = (roi[0],roi[1],roi[2],roi[3],roc_x,roc_y,self.roc_sphere,self.ellipticity,self.phaseMean,self.phaseStd,np.std(data-data_fitted))
+                vals2 = (roi[0],roi[1],roi[2],roi[3],roc_x,roc_y,self.roc_sphere,self.ellipticity,self.phaseMean,self.phaseStd,self.residualStdevGauss,self.residualStdevSphere)
                 f.write(txt1 % vals1)
                 f.write(txt2 % vals2)
-                f.write('filename,depth,centroid_left,centroid_top,sigma_x,sigma_y,theta,offset,tiltX,tiltY,roi_T,roi_L,roi_H,roi_W,RoC_x,RoC_y,RoC_sphere,ellipticity,meanPhaseStep,stdevPhaseStep,residual_stdev\n')
-                f.write('-,um,pix,pix,um,um,deg,um,mrad,mrad,pix,pix,pix,pix,um,um,um,-,deg,deg,um\n')            
+                f.write('filename,depth,centroid_left,centroid_top,sigma_x,sigma_y,theta,offset,tiltX,tiltY,roi_T,roi_L,roi_H,roi_W,RoC_x,RoC_y,RoC_sphere,ellipticity,meanPhaseStep,stdevPhaseStep,residual_stdev_gaussFit,residual_stdev_sphereFit\n')
+                f.write('-,um,pix,pix,um,um,deg,um,mrad,mrad,pix,pix,pix,pix,um,um,um,-,deg,deg,um,um\n')            
         except Exception as error:
             logging.error('error during writing to file %s: %s' % (os.path.join(fp, fn), error))
             raise Exception(error)
