@@ -11,7 +11,8 @@ import logging
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-import scipy.optimize as opt
+from scipy.optimize import curve_fit
+from scipy.optimize import leastsq
 from skimage.restoration import unwrap_phase
 from twoD_Gaussian import twoD_GaussianWithTilt
 from d4s import get_d4sigma
@@ -85,7 +86,7 @@ class fdmsImage():
                 msg = 'could not find path to analysis results directory: %s' % a_path
                 logging.error(msg)
                 raise Exception(msg)
-            a_path += os.path.basename(filename)[:8]
+            a_path = os.path.join(a_path, os.path.basename(filename)[:8])
             if not os.path.isdir(a_path):
                 os.mkdir(a_path)
                 print('created new directory for analysis results: %s' % a_path)
@@ -465,7 +466,7 @@ class fdmsImage():
             logging.info(line)
         
         initial_guessSurf = twoD_GaussianWithTilt((x, y, self.scale), *initial_guess).reshape(shape)
-        popt, pcov = opt.curve_fit(twoD_GaussianWithTilt, (x, y, self.scale), data.ravel(), p0=initial_guess)
+        popt, pcov = curve_fit(twoD_GaussianWithTilt, (x, y, self.scale), data.ravel(), p0=initial_guess)
         data_fitted = twoD_GaussianWithTilt((x, y, self.scale), *popt).reshape(shape)
         self.data_fitted = data_fitted
         self.popt = popt
@@ -509,7 +510,7 @@ class fdmsImage():
             title = 'fitted Gauss (with tilt) (um)\ndepth: %.2fum, sigma: (x=%.2f, y=%.2f)um\nRoC: (x=%.2f, y=%.2f)um, ellipticity: %.2f%%' % (popt[0], self.sigma[0], self.sigma[1], roc_x, roc_y, self.ellipticity*100)
             fig = self._plotData(data, title=title)
             ax = plt.gca()
-            ax.hold(True)
+            #ax.hold(True)
             ax.contour(x, y, data_fitted[::-1,:], 8, colors='w')
             #if self._plot_show:
             #    plt.show(block=False)
@@ -539,6 +540,28 @@ class fdmsImage():
             if self._plot_save:
                 fig.savefig(os.path.join(fp, fn+'_fitGauss.png'))
 
+        # now continue with fitting sphere
+        # find all (x, y) pixels within the 1/e radius from the dimple center 
+        idx = ((x-popt[1])/popt[3])**2 + ((y-popt[2])**2/popt[4]**2) < 1
+        # ravel data and make coordinates matrix:
+        coords = np.stack((x[idx].ravel(), y[idx].ravel(), data[idx].ravel())).T
+        #initial parameter guess using results from gauss fit
+        roc = (roc_x+roc_y)/2
+        p0 = (popt[3],popt[4],roc-popt[6],roc)
+        
+        # define error function
+        errfunc = lambda p, x: self._sphere(p, x) - p[3]        
+        p1, flag = leastsq(errfunc, p0, args=(coords,))
+        self.roc_sphere = p1[3]
+        sphere = np.nan*np.zeros(x.shape)
+        sphere[idx] = self._sphereSurf(p1, coords[:,:2])
+        if 1:
+            title = 'fit sphere (um)  -  RoC = %.3f' % self.roc_sphere
+            fig = self._plotData(sphere, title=title)
+            if self._plot_save:
+                fig.savefig(os.path.join(fp, fn+'_fitSphere.png'))
+
+        
         msg1 = 'calculated radii of curvature: %.3f and %.3f um' % self.radiiOfCurvature
         print(msg1)
         logging.info(msg1)
@@ -562,8 +585,8 @@ class fdmsImage():
         fp = self.a_path
         fn = self.filename[:15] + '_fit_at_' + self.a_time + '.txt'
 
-        with open(os.path.join(fp, fn), 'w') as f:
-            try:
+        try:
+            with open(os.path.join(fp, fn), 'w') as f:
                 f.write('Analysing file: %s\n' % self.filename)
                 f.write('Aanalysis timestamp: %s\n\n' % analysisTime)
                 if hasattr(self, 'roi'):
@@ -580,66 +603,44 @@ class fdmsImage():
                 f.write(msg4 + '\n')
                 f.write(msg5 + '\n')
                 logging.info('wrote output to file %s' % os.path.join(fp, fn))
-            except Exception as error:
-                logging.error('error during writing to file %s: %s' % (os.path.join(fp, fn), error))
-                raise Exception(error)
- 
+        except Exception as error:
+            logging.error('error during writing to file %s: %s' % (os.path.join(fp, fn), error))
+            raise Exception(error)
+        
         # write output in .csv file
         fn = self.filename[:15] + '_' + self.a_time + '_results.csv'
-        with open(os.path.join(fp, fn), 'w') as f:
-            f.write('File:,%s,analysis_time:,%s\n' % (self.filename, analysisTime))
-            txt1 = '%.3E,%.2f,%.2f,%.3E,%.3E,%.2f,%.3f,%.3E,%.3E,'
-            txt2 = '%d,%d,%d,%d,%.3f,%.3f,%.3E,%.3f,%.3f,%.5f\n'
-            vals1 = (popt[0],self.x_detector,self.y_detector,popt[3],popt[4],theta_deg,popt[6],popt[7],popt[8])
-            vals2 = (roi[0],roi[1],roi[2],roi[3],roc_x,roc_y,self.ellipticity,self.phaseMean,self.phaseStd,np.std(data-data_fitted))
-            f.write(txt1 % vals1)
-            f.write(txt2 % vals2)
-            f.write('depth,centroid_left,centroid_top,sigma_x,sigma_y,theta,offset,tiltX,tiltY,roi_T,roi_L,roi_H,roi_W,RoC_x,RoC_y,ellipticity,meanPhaseStep,stdevPhaseStep,residual_stdev\n')
-            f.write('um,pix,pix,um,um,deg,um,mrad,mrad,pix,pix,pix,pix,um,um,-,deg,deg,um\n')            
+        try:
+            with open(os.path.join(fp, fn), 'w') as f:
+                txt1 = '%s,%.3E,%.2f,%.2f,%.3E,%.3E,%.2f,%.3f,%.3E,%.3E,'
+                txt2 = '%d,%d,%d,%d,%.3f,%.3f,%.3f,%.3E,%.3f,%.3f,%.5f\n'
+                vals1 = (self.filename,popt[0],self.x_detector,self.y_detector,popt[3],popt[4],theta_deg,popt[6],popt[7],popt[8])
+                vals2 = (roi[0],roi[1],roi[2],roi[3],roc_x,roc_y,self.roc_sphere,self.ellipticity,self.phaseMean,self.phaseStd,np.std(data-data_fitted))
+                f.write(txt1 % vals1)
+                f.write(txt2 % vals2)
+                f.write('filename,depth,centroid_left,centroid_top,sigma_x,sigma_y,theta,offset,tiltX,tiltY,roi_T,roi_L,roi_H,roi_W,RoC_x,RoC_y,RoC_sphere,ellipticity,meanPhaseStep,stdevPhaseStep,residual_stdev\n')
+                f.write('-,um,pix,pix,um,um,deg,um,mrad,mrad,pix,pix,pix,pix,um,um,um,-,deg,deg,um\n')            
+        except Exception as error:
+            logging.error('error during writing to file %s: %s' % (os.path.join(fp, fn), error))
+            raise Exception(error)
+        print('wrote dimple parameters in csv file %s' % os.path.join(fp, fn))
 
-    
-    def fitCosine(self, roi, plotfit=False):
-        '''roi in (X, Y, W, H)
-        returns amplitude and phase'''
         
-        data = self.averagedImages[:,roi[1]:roi[1]+roi[3],roi[0]:roi[0]+roi[2]]
-        x = np.array(range(0,self.numStepAnalysis))*np.pi/2
-        y = np.mean(np.mean(data, axis=2), axis=1)
-        # val = amplitude * np.cos(x/period-phase) + offset
-
-        # initial guess
-        amplitude= (np.max(y)-np.min(y))/2
-        offset = np.max(y)-amplitude
-        # we already have a good estimate of the phase in self.unwrapped_phase
-        phaseData = self.unwrapped_phase[roi[1]:roi[1]+roi[3],roi[0]:roi[0]+roi[2]]
-        phase = np.mean(phaseData)
-        period = 1
-        initial_guess = (amplitude, phase, offset,  period)
-        popt, pcov = opt.curve_fit(self._cos, x, y,  p0=initial_guess)
-        txt = 'amplitude: %.3f phase: %.3f° offset: %.3f period: %.3f' % (popt[0],  popt[1]*180/np.pi,  popt[2],  popt[3])
-        print(txt)
-        #print('phase from map: %.3f deg' % (phase*180/np.pi))
-        if plotfit:
-            fig = plt.figure()
-            plt.hold(True)
-            plt.plot(x*180/np.pi ,y ,'r+-')
-            x_f = np.linspace(np.min(x), np.max(x), 200)
-            plt.plot(x_f*180/np.pi, image._cos(x_f,*popt),'g-')
-            plt.legend(('data', 'fit'))
-            plt.xlabel('phase (deg)')
-            plt.ylabel('signal (counts)')
-            txt = 'amplitude: %.3f phase: %.3f° offset: %.3f period: %.3f * 2PI' % (popt[0],  popt[1]*180/np.pi,  popt[2],  popt[3])
-            ax=plt.gca()
-            ax.text(0.05,0.85, txt, fontsize=11)
-            if self._plot_show:
-                plt.show(block=False)
-            plt.grid(True)
-        return popt
-
-    def _cos(self, x, amplitude, phase, offset,  period):
-        '''returns cosine for given x, amplitude, phase, offset and period. x and phase in radians'''
-        val = amplitude * np.cos(x/period-phase) + offset
-        return val
+    def _sphere(self, p, coords):
+        '''returns r at given coordinates for given p'''
+        # source https://stackoverflow.com/questions/15785428/how-do-i-fit-3d-data
+        x0, y0, z0, R = p
+        x, y, z = coords.T
+        return np.sqrt((x-x0)**2 + (y-y0)**2 + (z-z0)**2)
+        
+    def _sphereSurf(self, p, coords):
+        '''returns surface map for given (x,y) coordinates with given p'''
+        x0, y0, z0, R = p
+        x, y = coords.T
+        # R**2 = (x-x0)**2 + (y-y0)**2 + (z-z0)**2
+        # (z-z0)**2 = R**2 - ((x-x0)**2 + (y-y0)**2)
+        # z-z0 = np.sqrt(R**2 - ((x-x0)**2 + (y-y0)**2))
+        z = -np.sqrt(R**2 - ((x-x0)**2 + (y-y0)**2)) + z0
+        return z
         
     def _roc(self, sigma, depth):
         # returns the radius of curvature for a given sigma and depth
