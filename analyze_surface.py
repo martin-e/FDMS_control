@@ -16,7 +16,7 @@ from scipy.optimize import leastsq
 from skimage.restoration import unwrap_phase
 from twoD_Gaussian import twoD_GaussianWithTilt
 from d4s import get_d4sigma
-
+from IPython import embed
 
 class fdmsImage():
     def __init__(self, filename, a_path=''):
@@ -467,12 +467,16 @@ class fdmsImage():
         
         initial_guessSurf = twoD_GaussianWithTilt((x, y, self.scale), *initial_guess).reshape(shape)
         popt, pcov = curve_fit(twoD_GaussianWithTilt, (x, y, self.scale), data.ravel(), p0=initial_guess)
+        if popt[3] < popt[4]:
+            popt[3], popt[4] = popt[4], popt[3]
+            popt[5] += (popt[5] + np.pi/4)
+        popt[5] %= np.pi/2
         data_fitted = twoD_GaussianWithTilt((x, y, self.scale), *popt).reshape(shape)
         self.data_fitted = data_fitted
         self.popt = popt
         
         txt = '\t\tamplitude: %.3fum\n\t\t(x0, y0): (%.2f, %.2f) um\n\t\t(sigma_x, sigma_y): (%.4f, %.4f) um\n\t\ttheta: %.3f (deg)\n\t\toffset: %.3f um\n\t\tbackground tilt (x, y): (%.3E, %.3E) (mrad)'
-        theta_deg = np.mod(popt[5]/np.pi*180, 180)
+        theta_deg = popt[5]/np.pi*180
         vals = (popt[0], popt[1], popt[2], popt[3], popt[4], theta_deg, popt[6], popt[7], popt[8])
         
         print('found fit params:')
