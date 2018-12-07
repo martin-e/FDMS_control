@@ -4,10 +4,13 @@
 [fdms]
 MEASURE_SURFACE = True
 SHOOT_DIMPLE = False
+measure_datapath = C:\fdms\data
+PLOT_SAVE = True
+PLOT_SHOW = True
 
 # options for controlling the reference arm of the interferometer
 [piezo]
-pid = 1, 8e2, 0.005
+pid = 3, 600, 0.001
 offset = 0.05
 pvPerFringe = 0.4
 # range for which the control loop works

@@ -157,7 +157,12 @@ class PidController(Thread):
         dt = self._currtm - self._prevtm          # get delta t
         de = error - self._prevError              # get delta error
         Cp = self._Kp * error                     # proportional term
-        self._Ci += error * dt                # integral term
+        Ci = self._Ci + error * dt
+        if Ci < -0.2:                             # capping Ci term
+            Ci = -0.2
+        if Ci > 0.2:
+            Ci = 0.2
+        self._Ci = Ci                             # integral term
         Cd = 0
         if dt > 0:                                # no div by zero
             Cd = de/dt                            # derivative term
@@ -245,7 +250,7 @@ if __name__ == '__main__':
         u3.piezo = labjack.Piezo(u3)
         u3.adc = labjack.Adc(u3)
         u3.pulser = labjack.Pulser(u3)
-        parameters = {'pid' : (1, 8e2, 0.005), 'setpoint' : 0.4, 'ovMin' : -0.5, 'ovMax' : 10.0, 'pausetime' : 0.005,}
+        parameters = {'pid' : (3, 600, 0.001), 'setpoint' : 0.4, 'ovMin' : -0.5, 'ovMax' : 10.0, 'pausetime' : 0.005,}
         ctrl = PidController(u3, **parameters)
         # ctrl.start()
         # [print("%.3f %+.3f %+.3f %+.3f %+.3E %.2f" % (time.clock(), ctrl.getSetpoint(), ctrl.getPv(), ctrl.getError(), 1e2*ctrl.getCi(), ctrl.getPidLoopFrequency())) for a in range(50)]; ctrl.setSetpoint(0.85); [print("%.3f %+.3f %+.3f %+.3f %+.3E %.2f" % (time.clock(), ctrl.getSetpoint(), ctrl.getPv(), ctrl.getError(), 1e2*ctrl.getCi(), ctrl.getPidLoopFrequency())) for a in range(100)]; ctrl.setSetpoint(0.35); [print("%.3f %+.3f %+.3f %+.3f %+.3E %.2f" % (time.clock(), ctrl.getSetpoint(), ctrl.getPv(), ctrl.getError(), 1e2*ctrl.getCi(), ctrl.getPidLoopFrequency())) for a in range(100)]; ctrl.setSetpoint(0.7); [print("%.3f %+.3f %+.3f %+.3f %+.3E %.2f" % (time.clock(), ctrl.getSetpoint(), ctrl.getPv(), ctrl.getError(), 1e2*ctrl.getCi(), ctrl.getPidLoopFrequency())) for a in range(100)];

@@ -66,7 +66,7 @@ class Phase_stepping():
         for ii in range(self.phase_stepping_ini['nrSteps']):
             self.ctrl.setSetpoint(setpoints[ii])
             logging.debug('go to setpoint %.3f' % setpoints[ii])
-            time.sleep(0.25)
+            time.sleep(0.1)
             self.waitForPosition(1)
             pvs.append(self.ctrl.getPv())
             logging.info('PID setpoint: %.4f current position: %.4f' % (setpoints[ii], pvs[-1]))
