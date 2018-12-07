@@ -17,7 +17,7 @@ def parseInifile(file):
     parser.read(file)
 
     fdms = dict()
-    bools = ('MEASURE_SURFACE', 'SHOOT_DIMPLE', )
+    bools = ('MEASURE_SURFACE', 'SHOOT_DIMPLE', 'PLOT_SAVE', 'PLOT_SHOW', )
     strings = ('measure_datapath', )
     for option in bools:
         fdms[option] = parser.getboolean('fdms', option)

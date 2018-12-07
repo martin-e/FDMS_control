@@ -61,6 +61,8 @@ for (k, v) in dimple_shooting_ini.items():
     
 MEASURE_SURFACE = fdms_ini['MEASURE_SURFACE']
 SHOOT_DIMPLE = fdms_ini['SHOOT_DIMPLE']
+PLOT_SAVE = fdms_ini['PLOT_SAVE'] 
+PLOT_SHOW = fdms_ini['PLOT_SHOW']
 
 if MEASURE_SURFACE:
     import camera
