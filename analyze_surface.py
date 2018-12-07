@@ -46,6 +46,7 @@ class fdmsImage():
         image.plotPhase()
         image.plotUnwrappedPhase()
         image.plotHeight()
+        image.exportHeight()
 		image.fitGauss()
         '''
 
@@ -203,7 +204,11 @@ class fdmsImage():
         # the unwrap_phase function unwraps phase between -pi and pi
         self.unwrapped_phase = unwrap_phase(wrappedPhase)        
         self.height = self.unwrapped_phase/(np.pi*2) * self.wavelength/2 * 1e6 * -1
-        self.height -= self.height[0, 0]        
+        # subtract average height of corners from height profile
+        
+        bs = int(self.height.shape[0]/10)
+        corners = [np.mean(self.height[:bs,:bs]), np.mean(self.height[:bs,-bs:]), np.mean(self.height[-bs:,:bs]), np.mean(self.height[-bs:,-bs:])]
+        self.height -= np.mean(corners)
         logging.info('calculating contrast, phase and phase unwrapping done')
         
         img = self.averagedImages
@@ -339,7 +344,7 @@ class fdmsImage():
             extent = list(extentX)
             extent.append(extentY[0])
             extent.append(extentY[1])
-            plt.imshow(data, interpolation=interpolation, extent=extent, aspect='auto')
+            plt.imshow(data, interpolation=interpolation, extent=extent, aspect='auto', cmap='jet')
             plt.xlabel('position (um)')
             plt.ylabel('position (um)')
         else:
@@ -377,18 +382,60 @@ class fdmsImage():
         return fig
     
     def plotHeight(self):
-        data = self.height
-        bs = int(data.shape[0]/10)
-        corners = [np.mean(data[:bs,:bs]), np.mean(data[:bs,-bs:]), np.mean(data[-bs:,:bs]), np.mean(data[-bs:,-bs:])]
-        offset = np.mean(corners)
-
-        fig = self._plotData(self.height-offset, title='height (um)')
+        fig = self._plotData(self.height, title='height (um)')
         fp = self.a_path
         fn = self.filename[:15] + '_' + self.a_time + '_height.png'
         if self._plot_save:
             fig.savefig(os.path.join(fp, fn))
         return fig
+    
+    def exportHeight(self, path=''):
+        '''exports the height map (um units) in a hdf5 file
+        
+        input parameter        
+            path    directory where hdf5 file will be stored, defaults to instance analysis output 
+        returns the hdf5 file path
+        
+        reading example:
+            with h5py.File(<filepath>, 'r') as f:
+                heightmap = f['height'][...]
+                filename = height.attrs['filename']
+                analysis_timestamp = height.attrs['analysis_timestamp']
+                scale = height.attrs['scale']
+                roi = height.attrs['roi']
+                extent = height.attrs['extent']
+            '''
 
+        if not path:
+            path = self.a_path
+        try:
+            height = self.height
+        except AttributeError:
+            msg = 'interferograms not yet averaged! Run analyzeSurface() first!'
+            print(msg)
+            logging.error(msg)
+            return
+        fp = path
+        fn = self.filename[:15] + '_' + self.a_time + '_height.hdf5'
+        HDF5_FILE = os.path.abspath(os.path.join(fp, fn))
+        logging.debug('Open file %s for exporting height map' % HDF5_FILE)
+        with h5py.File(HDF5_FILE, 'w') as f:
+            dset = f.create_dataset("height", data=height, compression='lzf')
+            # filename containing interferogram images
+            dset.attrs['filename'] = np.string_(self.filename)
+            # timestamp of analysis
+            dset.attrs['analysis_timestamp'] = self.a_time
+            # pixel size of image
+            dset.attrs['scale'] = self.scale
+            # used ROI of interferogram
+            dset.attrs['roi'] = self.roi
+            shape = height.shape
+            extent = self.scale*1e6 * np.array((-shape[1], shape[1], -shape[0], shape[0]))/2
+            # extent (use in imshow plot function as extent=list(extent) argument for scaling axes)
+            dset.attrs['extent'] = extent
+        logging.info('Exported height map to %s' % HDF5_FILE)
+        return HDF5_FILE
+            
     def fitGauss(self, data=np.array([]), scale=0.1172E-6):
         '''fits a 2D Gauss to a calculated height
         

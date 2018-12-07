@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Class for performing measurements on and analysis of surfaces
@@ -51,10 +52,11 @@ class Phase_stepping():
         HDF5_FILE = os.path.join(self.datapath, filename)
         logging.info('Saving image data to %s' % HDF5_FILE)
         print('Saving image data to %s' % HDF5_FILE)
+        embed()
         try:
             f = h5py.File(HDF5_FILE, "w")
-            imageStack = f.create_dataset("images",(self.phase_stepping_ini['nrSteps'], self.phase_stepping_ini['nrImages'], image.getRows(), image.getCols()), dtype = hdfDtype)
-            timeStampStack = f.create_dataset("timestamps",(self.phase_stepping_ini['nrSteps'], self.phase_stepping_ini['nrImages']), dtype = np.float64)
+            imageStack = f.create_dataset("images",(self.phase_stepping_ini['nrSteps'], self.phase_stepping_ini['nrImages'], image.getRows(), image.getCols()), dtype=hdfDtype,  compression='gzip', compression_opts=9)
+            timeStampStack = f.create_dataset("timestamps",(self.phase_stepping_ini['nrSteps'], self.phase_stepping_ini['nrImages']), dtype=np.float64)
         except:
             logging.error('could not open hdf5 file %s' % HDF5_FILE)
             raise MeasureSurfaceError('error during creating HDF5 file')
