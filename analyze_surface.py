@@ -46,9 +46,10 @@ class fdmsImage():
         image.plotPhase()
         image.plotUnwrappedPhase()
         image.plotHeight()
+        image.plotPhaseStepper()
         image.exportHeight()
 		image.fitGauss()
-        '''
+        image.plotOverview()'''
 
         #define default behavior
         
@@ -299,7 +300,6 @@ class fdmsImage():
         if self._plot_save:
             fig.savefig(os.path.join(fp, fn))
 
-
     def plotAllInterferograms(self, interpolation="none"):
         filename = self.filename
         (nrSteps, nrImages, rows, cols) = np.shape(self.images)
@@ -337,13 +337,14 @@ class fdmsImage():
         shape = np.shape(data)
         
         if applyScaling:
-            extentX = self.scale*1e6 * np.array((0., shape[1]))
+            '''extentX = self.scale*1e6 * np.array((0., shape[1]))
             extentX -= np.mean(extentX)
             extentY = self.scale*1e6 * np.array((0., shape[0]))
             extentY -= np.mean(extentY)
             extent = list(extentX)
             extent.append(extentY[0])
-            extent.append(extentY[1])
+            extent.append(extentY[1])'''
+            extent = self.scale*1e6 * np.array((-shape[1], shape[1], -shape[0], shape[0]))/2
             plt.imshow(data, interpolation=interpolation, extent=extent, aspect='auto', cmap='jet')
             plt.xlabel('position (um)')
             plt.ylabel('position (um)')
@@ -694,6 +695,83 @@ class fdmsImage():
             raise Exception(error)
         print('wrote dimple parameters in csv file %s' % os.path.join(fp, fn))
 
+    
+    def plotOverview(self, interpolation='none'):
+        plt.close('all')
+        fig, axes = plt.subplots(2,2,figsize=(12,9))
+        plt.subplot(2,2,1)
+        ax = plt.gca()
+        im = self.averagedImages[0,...]
+        extentx = self.scale*1e6 * (np.array((0, im.shape[1]))-round(self.x_detector))
+        extenty = self.scale*1e6 * (np.array((0, im.shape[0]))-round(self.y_detector))
+        extent = list(np.concatenate((extentx, extenty)))
+        #plt.title('interferogram')
+        roi = np.array(self.roi)*self.scale*1e6
+        rect = patches.Rectangle((roi[1],roi[0]),roi[3],roi[2],linewidth=2, \
+                            linestyle='--',edgecolor='w',facecolor='none')
+        a = ax.imshow(im, cmap='cividis', extent=extent, interpolation=interpolation)
+        axes[0, 0].add_patch(rect)
+        plt.xlabel(u'x (um)')
+        plt.ylabel(u'y (um)')
+        cb1 = plt.colorbar(a, ax=ax)
+        cb1.set_label('Intensity')
+
+        plt.subplot(2,2,4)
+        height = self.height
+        gfit = self.data_fitted
+        popt = self.popt
+        shape = np.shape(height)
+        x = np.linspace(0, shape[1], shape[1]) * self.scale *1e6
+        x = x-np.mean(x)
+        y = np.linspace(0, shape[0], shape[0]) * self.scale *1e6
+        y = y-np.mean(y)
+        x, y = np.meshgrid(x, y)
+        extent = self.scale*1e6 * np.array((-shape[1], shape[1], -shape[0], shape[0]))/2
+        a = plt.imshow(height, interpolation=interpolation, extent=extent, aspect='auto', cmap='jet')
+        plt.xlabel('position (um)')
+        plt.ylabel('position (um)')
+        ax = plt.gca()
+        ax.contour(x, y, gfit[::-1,:], 8, colors='w')
+        cb1 = plt.colorbar(a, ax=ax)
+        cb1.set_label('Height')
+        plt.title('Measured height with fit 2d Gauss contour')
+        
+        plt.subplot(2,2,2)
+        residual = self.height - self.data_fitted
+        a = plt.imshow(residual, interpolation=interpolation, extent=extent, aspect='auto', cmap='jet')
+        ax = plt.gca()
+        plt.xlabel('position (um)')
+        plt.ylabel('position (um)')
+        cb1 = plt.colorbar(a, ax=ax)
+        cb1.set_label('Data - fit')
+        plt.title('residual of 2d Gauss fit')
+
+        plt.subplot(4,2,5)
+        xd = int(self.x_detector - self.roi[1])
+        yd = int(self.y_detector - self.roi[0])
+        plt.plot(x[0,:],height[yd,:],label='height')
+        plt.plot(x[0,:],gfit[yd,:],label='gauss fit')
+        plt.xlabel(u'x (μm)')
+        plt.ylabel('Height (um)')
+        plt.xlim(np.min(x[0,:]),np.max(x[0,:]))
+        plt.legend(loc='best')
+
+        plt.subplot(4,2,7)
+        plt.plot(y[:,0],height[:,xd],label='height')
+        plt.plot(y[:,0],gfit[:,xd],label='gauss fit')
+        plt.xlabel(u'y (μm)')
+        plt.ylabel('Height (um)')
+        plt.xlim(np.min(y[:,0]),np.max(y[:,0]))
+        plt.legend(loc='best')
+        plt.tight_layout()
+        
+        if self._plot_show:
+            plt.show(block=False)
+        if self._plot_save:
+            fp = self.a_path
+            fn = self.filename[:15] + '_' + self.a_time + '_overview.png'
+            fig.savefig(os.path.join(fp, fn))
+        return fig
         
     def _sphere(self, p, coords):
         '''returns r at given coordinates for given p'''
