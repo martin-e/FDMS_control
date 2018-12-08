@@ -558,7 +558,7 @@ class fdmsImage():
         
         fp = self.a_path
         fn = self.filename[:15] + '_' + self.a_time
-        if 1:
+        if 0:
             # contourplot
             title = 'fitted Gauss (with tilt) (um)\ndepth: %.2fum, sigma: (x=%.2f, y=%.2f)um\nRoC: (x=%.2f, y=%.2f)um, ellipticity: %.2f%%' % (popt[0], self.sigma[0], self.sigma[1], roc_x, roc_y, self.ellipticity*100)
             fig = self._plotData(data, title=title)
@@ -595,7 +595,9 @@ class fdmsImage():
 
         # now continue with fitting sphere
         # find all (x, y) pixels within the 1/e radius from the dimple center 
-        idx = ((x-popt[1])/popt[3])**2 + ((y-popt[2])**2/popt[4]**2) < 1
+        radius = (popt[3] + popt[4])/2
+        idx = ((x-popt[1])**2 + (y-popt[2])**2) < radius**2
+        #idx = ((x-popt[1])/popt[3])**2 + ((y-popt[2])**2/popt[4]**2) < 1
         # ravel data and make coordinates matrix:
         coords = np.stack((x[idx].ravel(), y[idx].ravel(), data[idx].ravel())).T
         #initial parameter guess using results from gauss fit
@@ -609,17 +611,18 @@ class fdmsImage():
         sphereFit = np.nan*np.zeros(x.shape)
         sphereFit[idx] = self._sphereSurf(p1, coords[:,:2])
         # fit debugging plots
+        self.sphereFit = sphereFit
+        self.residualSphereFit = np.nan*np.zeros(x.shape)
+        self.residualSphereFit[idx] = data[idx] - sphereFit[idx]
+        self.residualStdevSphere = np.std(self.residualSphereFit[idx])
 
-        if 1:
+        if 0:
             title = 'fit sphere (um)  -  RoC = %.3f' % self.roc_sphere
             fig = self._plotData(sphereFit, title=title)
             if self._plot_save:
                 fig.savefig(os.path.join(fp, fn+'_fitSphere.png'))
-            self.residual = np.nan*np.zeros(x.shape)
-            self.residual[idx] = data[idx] - sphereFit[idx]
-            self.residualStdevSphere = np.std(self.residual[idx])
             title = 'residual of spherical fit (um)  -  stdev: %.3E' % self.residualStdevSphere
-            fig = self._plotData(self.residual, title=title)
+            fig = self._plotData(self.residualSphereFit, title=title)
             if self._plot_save:
                 fig.savefig(os.path.join(fp, fn+'_fitSphereResidual.png'))
 
@@ -697,26 +700,25 @@ class fdmsImage():
 
     
     def plotOverview(self, interpolation='none'):
-        plt.close('all')
-        fig, axes = plt.subplots(2,2,figsize=(12,9))
-        plt.subplot(2,2,1)
+        fig, axes = plt.subplots(2,3,figsize=(16,9))
+        plt.subplot(2,3,1)
         ax = plt.gca()
         im = self.averagedImages[0,...]
-        extentx = self.scale*1e6 * (np.array((0, im.shape[1]))-round(self.x_detector))
-        extenty = self.scale*1e6 * (np.array((0, im.shape[0]))-round(self.y_detector))
-        extent = list(np.concatenate((extentx, extenty)))
-        #plt.title('interferogram')
+        plt.title('%s - interferogram 0/%d' % (self.filename[:15],self.numStepAnalysis))
         roi = np.array(self.roi)*self.scale*1e6
-        rect = patches.Rectangle((roi[1],roi[0]),roi[3],roi[2],linewidth=2, \
-                            linestyle='--',edgecolor='w',facecolor='none')
+        extent = [0, im.shape[1], 0, im.shape[0]]
+        rect = patches.Rectangle((self.roi[1], im.shape[0]-self.roi[0]-self.roi[2]), self.roi[3], \
+                        self.roi[2],linewidth=1, linestyle='--',edgecolor='r',facecolor='none')
         a = ax.imshow(im, cmap='cividis', extent=extent, interpolation=interpolation)
-        axes[0, 0].add_patch(rect)
-        plt.xlabel(u'x (um)')
-        plt.ylabel(u'y (um)')
+        ax.add_patch(rect)
+        plt.xlabel(u'x (px)')
+        plt.ylabel(u'y (px)')
         cb1 = plt.colorbar(a, ax=ax)
         cb1.set_label('Intensity')
+        plt.xlim([789-650, 789+650])
 
-        plt.subplot(2,2,4)
+        plt.subplot(2,3,2)
+        # plot measured height profile and gauss fit overlaid as contour plot
         height = self.height
         gfit = self.data_fitted
         popt = self.popt
@@ -733,20 +735,22 @@ class fdmsImage():
         ax = plt.gca()
         ax.contour(x, y, gfit[::-1,:], 8, colors='w')
         cb1 = plt.colorbar(a, ax=ax)
-        cb1.set_label('Height')
+        cb1.set_label('Height (um)')
         plt.title('Measured height with fit 2d Gauss contour')
         
-        plt.subplot(2,2,2)
+        plt.subplot(2,3,5)
+        # plot gauss fit residual
         residual = self.height - self.data_fitted
         a = plt.imshow(residual, interpolation=interpolation, extent=extent, aspect='auto', cmap='jet')
         ax = plt.gca()
         plt.xlabel('position (um)')
         plt.ylabel('position (um)')
         cb1 = plt.colorbar(a, ax=ax)
-        cb1.set_label('Data - fit')
-        plt.title('residual of 2d Gauss fit')
+        cb1.set_label('Data - fit (um)')
+        plt.title('residual of 2d Gauss fit - stdev: %.3f um' % self.residualStdevGauss)
 
-        plt.subplot(4,2,5)
+        plt.subplot(4,3,7)
+        # plot horizontal crossection
         xd = int(self.x_detector - self.roi[1])
         yd = int(self.y_detector - self.roi[0])
         plt.plot(x[0,:],height[yd,:],label='height')
@@ -756,14 +760,60 @@ class fdmsImage():
         plt.xlim(np.min(x[0,:]),np.max(x[0,:]))
         plt.legend(loc='best')
 
-        plt.subplot(4,2,7)
+        plt.subplot(4,3,10)
+        # plot vertical crossection
         plt.plot(y[:,0],height[:,xd],label='height')
         plt.plot(y[:,0],gfit[:,xd],label='gauss fit')
         plt.xlabel(u'y (μm)')
         plt.ylabel('Height (um)')
         plt.xlim(np.min(y[:,0]),np.max(y[:,0]))
         plt.legend(loc='best')
-        plt.tight_layout()
+        
+        '''plt.subplot(2,3,3)
+        # plot sphere fit
+        a = plt.imshow(self.sphereFit, interpolation=interpolation, extent=extent, aspect='auto', cmap='jet')
+        ax = plt.gca()
+        plt.xlabel('position (um)')
+        plt.ylabel('position (um)')
+        cb1 = plt.colorbar(a, ax=ax)
+        cb1.set_label('Height (um)')
+        plt.title('sphere fit - RoC: %.3f um' % self.roc_sphere)'''
+
+        plt.subplot(2,3,3)
+        # plot sphere fit residual
+        a = plt.imshow(self.residualSphereFit, interpolation=interpolation, extent=extent, aspect='auto', cmap='jet')
+        ax = plt.gca()
+        plt.xlabel('position (um)')
+        plt.ylabel('position (um)')
+        cb1 = plt.colorbar(a, ax=ax)
+        cb1.set_label('Data - fit (um)')
+        plt.title('residual of sphere fit - stdev: %.3f um' % self.residualStdevSphere)
+
+        plt.subplot(4,3,9)
+        # plot horizontal crossection
+        xd = int(self.x_detector - self.roi[1])
+        yd = int(self.y_detector - self.roi[0])
+        plt.plot(x[0,:],height[yd,:],label='height')
+        plt.plot(x[0,:],self.sphereFit[yd,:],label='sphere fit')
+        plt.xlabel(u'x (μm)')
+        plt.ylabel('Height (um)')
+        plt.xlim(np.min(x[0,:]),np.max(x[0,:]))
+        plt.legend(loc='best')
+
+        plt.subplot(4,3,12)
+        # plot vertical crossection
+        plt.plot(y[:,0],height[:,xd],label='height')
+        plt.plot(y[:,0],self.sphereFit[:,xd],label='sphere fit')
+        plt.xlabel(u'y (μm)')
+        plt.ylabel('Height (um)')
+        plt.xlim(np.min(y[:,0]),np.max(y[:,0]))
+        plt.legend(loc='best')
+
+        
+        plt.suptitle(u'Fiber dimple gaussian fit: RoC_x=%.2fum, RoC_y=%.2fμm, $\sigma_x$=%.2fμm, $\sigma_y$=%.2fμm, $z_t$=%.0fnm, asymmetry=%.1f%% - Circular fit RoC=%.2f um' % (*self.radiiOfCurvature, self.popt[3], self.popt[4], self.popt[0]*1e3, 100*self.ellipticity, self.roc_sphere))
+
+       #plt.tight_layout()
+        plt.subplots_adjust(top=0.913, bottom=0.066, left=0.053, right=0.967, hspace=0.350, wspace=0.500)
         
         if self._plot_show:
             plt.show(block=False)
@@ -772,6 +822,7 @@ class fdmsImage():
             fn = self.filename[:15] + '_' + self.a_time + '_overview.png'
             fig.savefig(os.path.join(fp, fn))
         return fig
+
         
     def _sphere(self, p, coords):
         '''returns r at given coordinates for given p'''
@@ -829,3 +880,4 @@ if __name__ == '__main__':
     phase for seven phase steps:
     phase_7 = atan((4*(img[1] - 2*img[3] + img[5])) / (-img[0] + 7*img[2] - 7*img[4] + img[6]))
     '''
+    
