@@ -19,7 +19,7 @@ from d4s import get_d4sigma
 from IPython import embed
 
 class fdmsImage():
-    def __init__(self, filename, a_path=''):
+    def __init__(self, filename, a_path='', plot_save=True, plot_show=True):
         '''
         Opens and reads hdf5 file stored by FDMS control software
         
@@ -29,6 +29,8 @@ class fdmsImage():
                             daily directory structure similar to how the measurement
                             data is organized. If omitted, it stores all output in
                             the same directory as the hdf5 file.
+            plot_save   store generated plots to disk
+            plot_show   show generated plots, it is useful to set this to False when batch-processing measurements
 
         image = fdmsImage(pathToHdf5File)
         image.analyzeSurface(roi=(410,390, 400, 400), \
@@ -53,27 +55,16 @@ class fdmsImage():
 
         #define default behavior
         
-        if 'PLOT_SAVE' in globals():
-            self._plot_save = bool(globals()['PLOT_SAVE'])
-            msg = 'using global setting for saving plots: %s saving' % ['Disabled', 'Enabled'][self._plot_save]
-            print(msg)
-            logging.info(msg)
-        else:
-            self._plot_save = True
-            msg = 'global parameter not found, %s saving figures' % ['disabled', 'enabled'][self._plot_save]
-            print(msg)
-            logging.info(msg)
+        self._plot_save = plot_save
+        msg = '%s saving figures' % ['Disabled', 'Enabled'][self._plot_save]
+        print(msg)
+        logging.info(msg)
 
-        if 'PLOT_SHOW' in globals():
-            self._plot_show = bool(globals()['PLOT_SHOW'])
-            msg = 'using global setting for displaying plots: %s displaying' % ['Disabled', 'Enabled'][self._plot_save]
-            print(msg)
-            logging.info(msg)
-        else:
-            self._plot_show = True
-            msg = 'global parameter not found, %s displaying figures' % ['disabled', 'enabled'][self._plot_show]
-            print(msg)
-            logging.info(msg)
+        self._plot_show = plot_show
+        msg = '%s displaying figures' % ['Disabled', 'Enabled'][self._plot_show]
+        print(msg)
+        logging.info(msg)
+
         
         msg = ('read contents of file %s' % filename)
         print(msg)
@@ -709,7 +700,13 @@ class fdmsImage():
         extent = [0, im.shape[1], 0, im.shape[0]]
         rect = patches.Rectangle((self.roi[1], im.shape[0]-self.roi[0]-self.roi[2]), self.roi[3], \
                         self.roi[2],linewidth=1, linestyle='--',edgecolor='r',facecolor='none')
-        a = ax.imshow(im, cmap='cividis', extent=extent, interpolation=interpolation)
+        for map in ('cividis', 'plasma', 'winter'):
+            if map in plt.colormaps():
+                cmap = map
+                break
+        else:
+            cmap = 'jet'
+        a = ax.imshow(im, cmap=cmap, extent=extent, interpolation=interpolation)
         ax.add_patch(rect)
         plt.xlabel(u'x (px)')
         plt.ylabel(u'y (px)')
