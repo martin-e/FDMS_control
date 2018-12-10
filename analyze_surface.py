@@ -646,7 +646,7 @@ class fdmsImage():
         logging.info(msg7)
 
         fp = self.a_path
-        fn = self.filename[:15] + '_fit_at_' + self.a_time + '.txt'
+        fn = self.filename[:15] + '_' + self.a_time + '_fit_results.txt'
 
         try:
             with open(os.path.join(fp, fn), 'w') as f:
