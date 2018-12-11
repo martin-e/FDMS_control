@@ -52,7 +52,6 @@ class Phase_stepping():
         HDF5_FILE = os.path.join(self.datapath, filename)
         logging.info('Saving image data to %s' % HDF5_FILE)
         print('Saving image data to %s' % HDF5_FILE)
-        embed()
         try:
             f = h5py.File(HDF5_FILE, "w")
             imageStack = f.create_dataset("images",(self.phase_stepping_ini['nrSteps'], self.phase_stepping_ini['nrImages'], image.getRows(), image.getCols()), dtype=hdfDtype,  compression='gzip', compression_opts=9)
@@ -68,8 +67,8 @@ class Phase_stepping():
         for ii in range(self.phase_stepping_ini['nrSteps']):
             self.ctrl.setSetpoint(setpoints[ii])
             logging.debug('go to setpoint %.3f' % setpoints[ii])
-            time.sleep(0.1)
-            self.waitForPosition(1)
+            time.sleep(0.15)
+            self.waitForPosition(timeout=2)
             pvs.append(self.ctrl.getPv())
             logging.info('PID setpoint: %.4f current position: %.4f' % (setpoints[ii], pvs[-1]))
             if abs(setpoints[ii] - pvs[-1]) > self.piezo_ini['maxError']:        
@@ -110,14 +109,14 @@ class Phase_stepping():
     
     def waitForPosition(self, timeout=10):
         start = time.time()
-        timeout = True
+        to = True
         while time.time() < (start + timeout):
             if self.ctrl.getError() > self.piezo_ini['maxError']:
                 time.sleep(0.020)
             else:
-                timeout = False
+                to = False
                 break
-        if timeout:
+        if to:
             msg = 'timeout while waiting for PID controller to reach position'
             print(msg)
             logging.warning(msg)
