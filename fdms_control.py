@@ -158,3 +158,4 @@ def stopFdms():
     
     log.info('stop log')
     logging.shutdown()
+    print('\n\nWARNING:  Restart python session before continuing with dimple shooting. Otherwise logging will not be stored!\n\n')
