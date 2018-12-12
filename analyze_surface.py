@@ -646,7 +646,7 @@ class fdmsImage():
         logging.info(msg7)
 
         fp = self.a_path
-        fn = self.filename[:15] + '_fit_at_' + self.a_time + '.txt'
+        fn = self.filename[:15] + '_' + self.a_time + '_fit_results.txt'
 
         try:
             with open(os.path.join(fp, fn), 'w') as f:
@@ -807,7 +807,7 @@ class fdmsImage():
         plt.legend(loc='best')
 
         
-        plt.suptitle(u'Fiber dimple gaussian fit: RoC_x=%.2fum, RoC_y=%.2fμm, $\sigma_x$=%.2fμm, $\sigma_y$=%.2fμm, $z_t$=%.0fnm, asymmetry=%.1f%% - Circular fit RoC=%.2f um' % (*self.radiiOfCurvature, self.popt[3], self.popt[4], self.popt[0]*1e3, 100*self.ellipticity, self.roc_sphere))
+        plt.suptitle(u'Fiber dimple gaussian fit: RoC_x=%.2fum, RoC_y=%.2fμm, $\sigma_x$=%.2fμm, $\sigma_y$=%.2fμm, $z_t$=%.0fnm, asymmetry=%.1f%% - Sphere fit RoC=%.2f um' % (*self.radiiOfCurvature, self.popt[3], self.popt[4], self.popt[0]*1e3, 100*self.ellipticity, self.roc_sphere))
 
        #plt.tight_layout()
         plt.subplots_adjust(top=0.913, bottom=0.066, left=0.053, right=0.967, hspace=0.350, wspace=0.500)
