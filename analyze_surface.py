@@ -699,7 +699,7 @@ class fdmsImage():
         roi = np.array(self.roi)*self.scale*1e6
         extent = [0, im.shape[1], 0, im.shape[0]]
         rect = patches.Rectangle((self.roi[1], im.shape[0]-self.roi[0]-self.roi[2]), self.roi[3], \
-                        self.roi[2],linewidth=1, linestyle='--',edgecolor='r',facecolor='none')
+                        self.roi[2],linewidth=1, linestyle='--',edgecolor='w',facecolor='none')
         for map in ('cividis', 'plasma', 'winter'):
             if map in plt.colormaps():
                 cmap = map

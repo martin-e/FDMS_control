@@ -161,10 +161,10 @@ class Sdg2000x():
         try:
             self.awgDev.write('C1:BTWV MTRIG')
             log.info('triggered AWG')
-            time.sleep(self.duration+0.01)
+            time.sleep(self.duration+0.4)
             self.setOutput(2,False)
-        except:
-            msg = 'error during attempt to shoot laser, disarm'
+        except Exception as e:
+            msg = 'error during attempt to shoot laser, disarm. Error: %s' % e
             print(msg)
             log.warning(msg)
         self.setOutput(2,False)

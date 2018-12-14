@@ -36,7 +36,7 @@ class DimpleShooting():
         period:     [float] multiple pulse period time in s
         '''
 
-        txt = ['This value is taken from the ini file', '']
+        txt = ['', 'This value is taken from the ini file']
 
         defaultWidth = self.dimple_shooting_ini['width']
         width = kwargs.get('width', defaultWidth)

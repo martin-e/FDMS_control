@@ -155,17 +155,18 @@ class PidController(Thread):
     def calculateControlVariable(self, error):
         self._currtm = time.time()                # get t
         dt = self._currtm - self._prevtm          # get delta t
+        dtx = 0.005           # assuming ~100 Hz
         de = error - self._prevError              # get delta error
         Cp = self._Kp * error                     # proportional term
-        Ci = self._Ci + error * dt
+        Ci = self._Ci + error * dtx
         if Ci < -0.2:                             # capping Ci term
             Ci = -0.2
         if Ci > 0.2:
             Ci = 0.2
         self._Ci = Ci                             # integral term
         Cd = 0
-        if dt > 0:                                # no div by zero
-            Cd = de/dt                            # derivative term
+        if dtx > 0:                                # no div by zero
+            Cd = de/dtx                            # derivative term
         self._prevtm = self._currtm               # save t for next pass
         self._prevError = error                   # save t-1 error
         return (Cp + (self._Ki * self._Ci) + (self._Kd * Cd), dt)
