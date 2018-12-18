@@ -87,7 +87,7 @@ if MEASURE_SURFACE:
             log.warning('piezo not at setpoint after initialisation')
         time.sleep(0.1)
     
-    cam = camera.Camera(camera_ini)
+    cam = camera.CameraClient(camera_ini)
     
     measure = measure_surface.Phase_stepping(piezo_ini, phase_stepping_ini, cam, ctrl, dailydir)
 

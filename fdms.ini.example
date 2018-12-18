@@ -20,16 +20,11 @@ pvMax = 0.9
 maxError = 0.01
 
 [camera]
-# format 7 mode: 0 is 8 bit only, 7 uses the 12 bit DAC
-fm7Mode = 7
-# offset_X, offset_Y, width, height
-roi = 552, 46, 1100, 1100
-framerate = 20
-# integration time in milliseconds
-integrationTime = 40
-# bits per pixel, 8 or 16 (16 only supported in format 7 mode 7)
+framerate = 30
+# integration time in microseconds
+exposureTime = 592
+# bits per pixel, 8 or 16
 nrBits = 16
-sharpness = 0
 
 [phase_stepping]
 # number of interferograms that will be recorded

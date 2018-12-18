@@ -1,25 +1,202 @@
 # -*- coding: utf-8 -*-
-"""
+'''
 @author: eschenm
-"""
+'''
 
 import logging
+import numpy as np
 import sys
+import socket
 import time
-import PyCapture2
 import numpy as np
 
 
 class CameraError(Exception):
+    '''Raised in case of failed interaction with the camera application.'''
     pass
 
-    
-# properties = ['BRIGHTNESS', 'AUTO_EXPOSURE', 'SHARPNESS', 'WHITE_BALANCE', 'HUE', 'SATURATION', 'GAMMA', 'IRIS', 'FOCUS', 'ZOOM', 'PAN', 'TILT', 'SHUTTER', 'GAIN', 'TRIGGER_MODE', 'TRIGGER_DELAY', 'FRAME_RATE', 'TEMPERATURE', 'UNSPECIFIED_PROPERTY_TYPE']
+
+class CameraClient:
+
+    def __init__(self, camera_ini, host='localhost', tcpport=14901):
+        logging.info('opening connection to camera application')
+        self._ini = camera_ini
+        try:
+            self._sock = socket.create_connection((host, tcpport))
+            self._recv_buf = bytearray()
+        except Exception as e:
+            raise CameraError('error during connecting, is camera application started? Message: %s' % e)
+        resp = self.read_line()
+        if not resp.startswith(b'QMI_CAMERA'):
+            raise CameraError('Unexpected message from camera server application')
+        logging.debug('successfully opened connection to camera application')
+        nrBits = str(camera_ini['nrBits'])
+        if nrBits not in ['8', '16']:
+            raise CameraError('illegal nr of bits in .ini file: %s' % nrBits)
+        self.set_pixel_format('Mono'+nrBits)
+        self.set_black_level(0)
+        self.set_gain(0)
+        self.start_acquisition()
+        self.set_exposure_time(camera_ini['exposureTime'])
+        self.set_frame_rate(camera_ini['framerate'])
+        self.start_acquisition()
+        logging.info('connected and started camera')
+        
+    def close(self):
+        self._sock.close()
+        self._sock = None
+        logging.debug('closed connection to camera application')
+        
+    def read_line(self):
+        while True:
+            p = self._recv_buf.find(b'\n')
+            if p >= 0:
+                line = self._recv_buf[:p]
+                self._recv_buf = self._recv_buf[p+1:]
+                return line
+            d = self._sock.recv(4096)
+            if not d:
+                raise CameraError('Connection closed by server')
+            self._recv_buf.extend(d)
+
+    def read_bytes(self, n):
+        while len(self._recv_buf) < n:
+            d = self._sock.recv(n - len(self._recv_buf))
+            if not d:
+                raise CameraError('Connection closed by server')
+            self._recv_buf.extend(d)
+        data = self._recv_buf[:n]
+        self._recv_buf = self._recv_buf[n:]
+        return data
+
+    def cmd(self, cmd):
+        self._sock.sendall(cmd.encode('UTF-8') + b'\n')
+        resp = self.read_line()
+        if resp.startswith(b'ERR '):
+            raise CameraError('Command failed: ' + resp[4:].decode('UTF-8', errors='replace'))
+        if not resp.startswith(b'OK'):
+            raise CameraError('Invalid response from server')
+
+    def ask(self, cmd):
+        self._sock.sendall(cmd.encode('UTF-8') + b'\n')
+        resp = self.read_line()
+        if resp.startswith(b'ERR '):
+            raise CameraError('Command failed: ' + resp[4:].decode('UTF-8', errors='replace'))
+        try:
+            v = float(resp.strip())
+        except ValueError:
+            raise CameraError('Invalid response from server')
+        return v
+
+    def get_image(self):
+        '''Retrieve the most recent image from the camera.
+
+        Returns a tuple (image_data, meta_data)
+            where image_data is a 2D numpy array containing pixel values;
+                  meta_data is a numpy record containing image meta data.
+
+        Note that calling this function repeatedly may cause the same
+        image to be returned more than once.
+        '''
+
+        logging.debug('request image from camera application')
+        self._sock.sendall(b'get_image\n')
+        # Read image data.
+        resp = self.read_line()
+        if resp.startswith(b'ERR '):
+            raise CameraError('Command failed: ' + resp[4:].decode('UTF-8', errors='replace'))
+        try:
+            n = int(resp.strip())
+        except ValueError:
+            raise CameraError('Invalid response from server')
+        d1 = self.read_bytes(n)
+        eol = self.read_bytes(1)
+        if eol != b'\n':
+            raise CameraError('Invalid response from server')
+        # Read meta data.
+        resp = self.read_line()
+        try:
+            n = int(resp.strip())
+        except ValueError:
+            raise CameraError('Invalid response from server')
+        d2 = self.read_bytes(n)
+        eol = self.read_bytes(1)
+        if eol != b'\n':
+            raise CameraError('Invalid response from server')
+        image_data = np.loads(d1)
+        meta_data = np.loads(d2)
+        return (image_data, meta_data)
+
+    def decode_meta_data(self, meta):
+        '''decodes the image meta data'''
+        meta_data = {'width': meta['width'],
+             'height': meta['height'],
+             'offset_x': meta['offset_x'],
+             'offset_y': meta['offset_y'],
+             'pixel_format': meta['pixel_format'].decode(),
+             'frame_id': meta['frame_id'],
+             'image_id': meta['image_id'],
+             'timestamp': meta['timestamp'],
+             'gain': meta['gain'],
+             'black_level': meta['black_level'],
+             'exposure_time': meta['exposure_time']}
+        return meta_data
+        
+    def set_frame_rate(self, frame_rate):
+        '''Set camera frame rate in frames/second.'''
+        self.cmd('set_frame_rate {}'.format(frame_rate))
+        logging.debug('set frame rate to {}'.format(frame_rate))
+
+    def get_frame_rate(self):
+        '''Return camera frame rate in frames/second.'''
+        return self.ask('get_frame_rate')
+
+    def set_exposure_time(self, exposure_time):
+        '''Set exposure time in microseconds.'''
+        self.cmd('set_exposure_time {}'.format(exposure_time))
+        logging.debug('set exposure time to {} microsecond'.format(exposure_time))
+
+    def get_exposure_time(self):
+        '''Return exposure time in microseconds.'''
+        return self.ask('get_exposure_time')
+
+    def set_pixel_format(self, pixel_format):
+        '''Set pixel data format. Valid values are 'Mono8' and 'Mono16'.'''
+        self.cmd('set_pixel_format {}'.format(pixel_format))
+        logging.debug('set pixel format to: {}'.format(pixel_format))
+
+    def set_black_level(self, black_level):
+        '''Set black level in percent.'''
+        self.cmd('set_black_level {}'.format(black_level))
+        logging.debug('set black level to: {}'.format(black_level))
+
+    def get_black_level(self):
+        '''Return black level in percent.'''
+        return self.ask('get_black_level')
+
+    def set_gain(self, gain):
+        '''Set analog gain in dB.'''
+        self.cmd('set_gain {}'.format(gain))
+        logging.debug('set gain to {}'.format(gain))
+
+    def get_gain(self):
+        '''Return analog gain in dB.'''
+        return self.ask('get_gain')
+
+    def start_acquisition(self):
+        '''Start streaming video acquisition.'''
+        self.cmd('start_acquisition')
+        logging.debug('start acquisition')
+
+    def stop_acquisition(self):
+        '''Stop streaming video acquisition.'''
+        self.cmd('stop_acquisition')
+        logging.debug('stopped acquisition')
 
 class Camera():
     def __init__(self, camera_ini):
         libVer = PyCapture2.getLibraryVersion()
-        logging.info("PyCapture2 library version: %d.%d.%d.%d" % (libVer[0], libVer[1], libVer[2], libVer[3]))
+        logging.info('PyCapture2 library version: %d.%d.%d.%d' % (libVer[0], libVer[1], libVer[2], libVer[3]))
         self.connectCam()
         self.prepareSettings(camera_ini)
 
@@ -55,7 +232,7 @@ class Camera():
             logging.error('invalid or unsupporte nr of bits per pixel given in .ini file')
             raise CameraError('invalid or unsupporte nr of bits per pixel given in .ini file')
 
-        logging.debug('disabling all properties which can be set to \"auto\"')
+        logging.debug('disabling all properties which can be set to \'auto\'')
         for item in dir(PyCapture2.PROPERTY_TYPE):
             propType = getattr(PyCapture2.PROPERTY_TYPE, item)
             if propType > 16:

@@ -7,9 +7,12 @@ Created on Mon Jun 12 12:08:32 2017
 @author: eschenm
 """
 
-import logging, sys, os, time, h5py
+import logging
+import sys
+import os
+import time
+import h5py
 import numpy as np
-import PyCapture2
 
 
 class MeasureSurfaceError(Exception):
@@ -25,28 +28,18 @@ class Phase_stepping():
         self.datapath = datapath
 
     def recordSurface(self):
-        try:
-            self.cam.startCapture()
-        except PyCapture2.Fc2error as err:
-            msg = 'Error from camera: %s' % err
-            logging.warning(msg)
-            print(msg)
-        time.sleep(0.1)
-        image = self.cam.retrieveBuffer()
-        pixformat = image.getPixelFormat()
-        if pixformat == PyCapture2.PIXEL_FORMAT.MONO8:
+        (image, meta) = self.cam.get_image()
+        meta = self.cam.decode_meta_data(meta)
+        pixformat = self.cam._ini['nrBits']
+        if pixformat == 8:
             dtype = np.uint8
-            hdfDtype = dtype
-        elif pixformat == PyCapture2.PIXEL_FORMAT.MONO16:
+        elif pixformat == 16:
             dtype = np.uint16
-            hdfDtype = dtype
         else:
-            for format in dir(PyCapture2.PIXEL_FORMAT):
-                if getattr(PyCapture2.PIXEL_FORMAT, format) == pixformat:
-                    break
-            msg = 'unsupported image format: %s' % format
+            msg = 'unsupported number of bits: %d' % pixformat
             logging.error(msg)
             raise MeasureSurfaceError(msg)
+        hdfDtype = dtype
 
         filename = time.strftime('%Y%m%dT%H%M%S_interferograms.hdf5')
         HDF5_FILE = os.path.join(self.datapath, filename)
@@ -54,8 +47,14 @@ class Phase_stepping():
         print('Saving image data to %s' % HDF5_FILE)
         try:
             f = h5py.File(HDF5_FILE, "w")
-            imageStack = f.create_dataset("images",(self.phase_stepping_ini['nrSteps'], self.phase_stepping_ini['nrImages'], image.getRows(), image.getCols()), dtype=hdfDtype,  compression='gzip', compression_opts=9)
-            timeStampStack = f.create_dataset("timestamps",(self.phase_stepping_ini['nrSteps'], self.phase_stepping_ini['nrImages']), dtype=np.float64)
+            imageStack = f.create_dataset("images",
+                (self.phase_stepping_ini['nrSteps'], self.phase_stepping_ini['nrImages'], meta['height'], meta['width']), 
+                dtype=hdfDtype, 
+                compression='gzip', 
+                compression_opts=9)
+            timeStampStack = f.create_dataset("timestamps",
+                (self.phase_stepping_ini['nrSteps'], self.phase_stepping_ini['nrImages']), 
+                dtype=np.float64)
         except:
             logging.error('could not open hdf5 file %s' % HDF5_FILE)
             raise MeasureSurfaceError('error during creating HDF5 file')
@@ -68,7 +67,7 @@ class Phase_stepping():
             self.ctrl.setSetpoint(setpoints[ii])
             logging.debug('go to setpoint %.3f' % setpoints[ii])
             time.sleep(0.15)
-            self.waitForPosition(timeout=2)
+            self.waitForPosition(timeout=1)
             pvs.append(self.ctrl.getPv())
             logging.info('PID setpoint: %.4f current position: %.4f' % (setpoints[ii], pvs[-1]))
             if abs(setpoints[ii] - pvs[-1]) > self.piezo_ini['maxError']:        
@@ -82,12 +81,14 @@ class Phase_stepping():
                 logging.info(msg)
                 print(msg)
             # record number of images and store in hdf5 file
+            print('step {}/{} - recording {} images: '.format(ii+1, self.phase_stepping_ini['nrSteps'], self.phase_stepping_ini['nrImages']), end = '')
             for jj in range(self.phase_stepping_ini['nrImages']):
-                image = self.cam.retrieveBuffer()
-                data = self.cam.getImageData(image)
-                imageArray = np.fromstring(data, dtype)
-                imageStack[ii,jj,...] = imageArray.reshape([self.cam.fm7Settings.height, self.cam.fm7Settings.width])
-                timeStampStack[ii,jj] = self.cam.getImageTimestamp(image)
+                (image, meta_data) = self.cam.get_image()
+                meta = self.cam.decode_meta_data(meta_data)
+                imageStack[ii,jj,...] = image
+                timeStampStack[ii,jj] = meta['timestamp']
+                print('{}'.format(jj+1), end=' ')
+            print('\n')
             logging.info('recorded %d images at step %d' % (jj+1, ii+1))         
     
         # set pid controller back to start position
@@ -104,10 +105,9 @@ class Phase_stepping():
         f.flush()
         f.close()
         logging.debug('closed hdf5 file')
-        self.cam.stopCapture()
         return HDF5_FILE
     
-    def waitForPosition(self, timeout=10):
+    def waitForPosition(self, timeout=2):
         start = time.time()
         to = True
         while time.time() < (start + timeout):

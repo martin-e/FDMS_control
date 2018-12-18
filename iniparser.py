@@ -34,13 +34,12 @@ def parseInifile(file):
 
     # reading camera ini settings
     camera = dict()
-    floats = ('framerate', 'integrationTime', )
-    ints = ('nrBits', 'fm7Mode', 'sharpness', )
+    floats = ('framerate', 'exposureTime', )
+    ints = ('nrBits', )
     for option in floats:
         camera[option] = float(parser.get('camera', option))
     for option in ints:
         camera[option] = int(parser.get('camera', option))
-    camera['roi'] = [int(val) for val in parser.get('camera', 'roi').split(',')]
 
     # reading awg ini settings
     # channel 1 MUST be connected to the digital input of the RF driver

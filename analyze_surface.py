@@ -752,7 +752,7 @@ class fdmsImage():
         yd = int(self.y_detector - self.roi[0])
         plt.plot(x[0,:],height[yd,:],label='height')
         plt.plot(x[0,:],gfit[yd,:],label='gauss fit')
-        plt.xlabel(u'x (μm)')
+        plt.xlabel(u'x (um)')
         plt.ylabel('Height (um)')
         plt.xlim(np.min(x[0,:]),np.max(x[0,:]))
         plt.legend(loc='best')
@@ -761,7 +761,7 @@ class fdmsImage():
         # plot vertical crossection
         plt.plot(y[:,0],height[:,xd],label='height')
         plt.plot(y[:,0],gfit[:,xd],label='gauss fit')
-        plt.xlabel(u'y (μm)')
+        plt.xlabel(u'y (um)')
         plt.ylabel('Height (um)')
         plt.xlim(np.min(y[:,0]),np.max(y[:,0]))
         plt.legend(loc='best')
@@ -792,7 +792,7 @@ class fdmsImage():
         yd = int(self.y_detector - self.roi[0])
         plt.plot(x[0,:],height[yd,:],label='height')
         plt.plot(x[0,:],self.sphereFit[yd,:],label='sphere fit')
-        plt.xlabel(u'x (μm)')
+        plt.xlabel(u'x (um)')
         plt.ylabel('Height (um)')
         plt.xlim(np.min(x[0,:]),np.max(x[0,:]))
         plt.legend(loc='best')
@@ -801,13 +801,13 @@ class fdmsImage():
         # plot vertical crossection
         plt.plot(y[:,0],height[:,xd],label='height')
         plt.plot(y[:,0],self.sphereFit[:,xd],label='sphere fit')
-        plt.xlabel(u'y (μm)')
+        plt.xlabel(u'y (um)')
         plt.ylabel('Height (um)')
         plt.xlim(np.min(y[:,0]),np.max(y[:,0]))
         plt.legend(loc='best')
 
         
-        plt.suptitle(u'Fiber dimple gaussian fit: RoC_x=%.2fum, RoC_y=%.2fμm, $\sigma_x$=%.2fμm, $\sigma_y$=%.2fμm, $z_t$=%.0fnm, asymmetry=%.1f%% - Sphere fit RoC=%.2f um' % (*self.radiiOfCurvature, self.popt[3], self.popt[4], self.popt[0]*1e3, 100*self.ellipticity, self.roc_sphere))
+        plt.suptitle(u'Fiber dimple gaussian fit: RoC_x=%.2fum, RoC_y=%.2fum, $\sigma_x$=%.2fum, $\sigma_y$=%.2fum, $z_t$=%.0fnm, asymmetry=%.1f%% - Sphere fit RoC=%.2f um' % (*self.radiiOfCurvature, self.popt[3], self.popt[4], self.popt[0]*1e3, 100*self.ellipticity, self.roc_sphere))
 
        #plt.tight_layout()
         plt.subplots_adjust(top=0.913, bottom=0.066, left=0.053, right=0.967, hspace=0.350, wspace=0.500)
