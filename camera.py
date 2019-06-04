@@ -25,7 +25,7 @@ class CameraClient:
             self._sock = socket.create_connection((host, tcpport))
             self._recv_buf = bytearray()
         except Exception as e:
-            raise CameraError('error during connecting, is camera application started? Message: %s' % e)
+            raise CameraError('error during connecting, make sure camera server application is started! Message: %s' % e)
         resp = self.read_line()
         if not resp.startswith(b'QMI_CAMERA'):
             raise CameraError('Unexpected message from camera server application')

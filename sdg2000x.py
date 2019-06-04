@@ -19,7 +19,6 @@ import struct
 import time
 import logging
 
-
 class AwgError(Exception):
     pass
 
@@ -90,8 +89,8 @@ class Sdg2000x():
         self.awgDev.write('*RST')   # reset to factory defaults
         time.sleep(0.25)
         self.awgDev.write('BUZZ OFF')
-        self.setOutput(1, False)
         self.setOutput(2, False)
+        self.setOutput(1, False)
         self.setLoad(1, self.awg_ini['load1'])
         self.setLoad(2, self.awg_ini['load2'])
         self.awgDev.write('C1:OUTP PLRT, NOR')
@@ -148,7 +147,6 @@ class Sdg2000x():
         self.awgDev.write('C1:BTWV TRSR, MAN')
         self.awgDev.write('C1:BTWV GATE_NCYC, NCYC')
         self.awgDev.write('C1:BTWV TIME, %d' % cycles)
-        self.setOutput(2,True)
         self.isArmed = True
         self.duration = cycles * period
         msg ='AWG armed: width=%.3Es, nr of cycles=%d, period=%.3Es and TTL height=%.3E' % (width, cycles, period, height)
@@ -159,6 +157,9 @@ class Sdg2000x():
         if not self.isArmed:
             raise AwgError('awg is not armed')
         try:
+            self.setOutput(2,True)
+            time.sleep(0.25)
+            self.getOutput(2)
             self.awgDev.write('C1:BTWV MTRIG')
             log.info('triggered AWG')
             time.sleep(self.duration+0.4)
@@ -168,6 +169,44 @@ class Sdg2000x():
             print(msg)
             log.warning(msg)
         self.setOutput(2,False)
+        self.isArmed = False
+        log.info('disarmed AWG')
+
+    def prepareBurstWithoutArm(self, period, width, cycles):
+        # METHOD ASSUMES OUTPUTS ARE ENABLED!!!
+        # height for sending TTL pulse to the digital input
+        height = 4.5
+        self.setOutput(2,False)
+        self.awgDev.write('C1:BSWV WVTP, PULSE')
+        self.awgDev.write('C1:BSWV LLEV, 0V')
+        self.awgDev.write('C1:BSWV HLEV, %.4fV' % height)
+        self.awgDev.write('C1:BSWV PERI, %.5E'  % period)
+        self.awgDev.write('C1:BSWV WIDTH, %.5E' % width)
+        self.awgDev.write('C1:BSWV DLY, 0')
+        self.awgDev.write('C1:BSWV RISE, 8.4E-9S')
+        self.awgDev.write('C1:BSWV FALL, 8.4E-9S')
+        self.awgDev.write('C1:BTWV STATE, ON')
+        self.awgDev.write('C1:BTWV TRSR, MAN')
+        self.awgDev.write('C1:BTWV GATE_NCYC, NCYC')
+        self.awgDev.write('C1:BTWV TIME, %d' % cycles)        
+        int(self.awgDev.query('*OPC?'))
+        self.duration = cycles * period + width
+        msg ='AWG prepared: width=%.3Es, nr of cycles=%d, period=%.3Es and TTL height=%.3E' % (width, cycles, period, height)
+        print(msg)
+        logging.info(msg)
+        self.setOutput(2,True)
+        time.sleep(0.5)
+
+    def sendBurstWithoutArm(self):
+        # METHOD ASSUMES OUTPUTS ARE ENABLED!!!
+        try:
+            self.awgDev.write('C1:BTWV MTRIG')
+            log.info('triggered AWG')
+            time.sleep(self.duration+0.1)
+        except Exception as e:
+            msg = 'error during attempt to shoot laser. Error: %s' % e
+            print(msg)
+            log.warning(msg)
         self.isArmed = False
         log.info('disarmed AWG')
 
@@ -191,10 +230,10 @@ class Sdg2000x():
     def getOutput(self, channel):
         # returns True when Output is enabled and False if not
         if channel in (1, 2):
-            answer = self.awgDev.write('C%d:OUTP?' % channel)
+            answer = self.awgDev.ask('C%d:OUTP?' % channel)
             log.debug('AWG channel %d status: %s' % (channel, str(answer)))
             if len(answer) > 12:
-                state = answer.split(',')[0][9:]
+                state = answer.split(',')[0][8:]
                 if state == 'OFF':
                     return False
                 elif state == 'ON':
