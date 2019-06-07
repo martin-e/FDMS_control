@@ -54,6 +54,7 @@ class Sdg2000x():
         self.awgDev = self.rm.open_resource(device)
         self.isConnected = True
         log.info('AWG connected')
+        self.awgDev.timeout = 5000
 
     def close(self):
         if self.isConnected:
@@ -188,14 +189,18 @@ class Sdg2000x():
         self.awgDev.write('C1:BTWV STATE, ON')
         self.awgDev.write('C1:BTWV TRSR, MAN')
         self.awgDev.write('C1:BTWV GATE_NCYC, NCYC')
-        self.awgDev.write('C1:BTWV TIME, %d' % cycles)        
-        int(self.awgDev.query('*OPC?'))
+        self.awgDev.write('C1:BTWV TIME, %d' % cycles)
+        try:
+            int(self.awgDev.query('*OPC?'))
+        except:
+            pass
         self.duration = cycles * period + width
         msg ='AWG prepared: width=%.3Es, nr of cycles=%d, period=%.3Es and TTL height=%.3E' % (width, cycles, period, height)
         print(msg)
         logging.info(msg)
+        time.sleep(1)
         self.setOutput(2,True)
-        time.sleep(0.5)
+        time.sleep(1)
 
     def sendBurstWithoutArm(self):
         # METHOD ASSUMES OUTPUTS ARE ENABLED!!!
