@@ -28,4 +28,17 @@ def twoD_Gaussian(xdata_tuple, amplitude, xo, yo, sigma_x, sigma_y, theta, offse
                             + c*((y-yo)**2)))
     return g.ravel()
 
+def simple_twoD_Gaussian(xdata_tuple, amplitude, xo, yo, sigma_x, sigma_y, offset):
+    '''twoD_Gaussian(xdata_tuple, amplitude, xo, yo, sigma_x, sigma_y, offset)
+    '''
+    (x,  y) = xdata_tuple
+    xo = float(xo)
+    yo = float(yo)
+    a = 1/(2*sigma_x**2)
+    b = 0
+    c = 1/(2*sigma_y**2)
+    g = offset + amplitude*np.exp( -(a*((x-xo)**2) + c*((y-yo)**2)))
+    return g.ravel()
+
+
     # source https://stackoverflow.com/questions/21566379/fitting-a-2d-gaussian-function-using-scipy-optimize-curve-fit-valueerror-and-m
